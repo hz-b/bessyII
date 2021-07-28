@@ -1,2 +1,3 @@
 include versioneer.py
 include bessyii_devices/_version.py
+include bessyii/_version.py

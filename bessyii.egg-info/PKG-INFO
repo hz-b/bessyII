@@ -1,0 +1,10 @@
+Metadata-Version: 1.0
+Name: bessyii
+Version: 0.post1.dev0+gd4b4931
+Summary: A collection of tools and scripts useful for data collection and analsis at BESSY II
+Home-page: https://gitlab.helmholtz-berlin.de/sissy/experiment-control/bessyii
+Author: Will Smith, Simone Vadilonga, Sebastian Kazarski
+Author-email: william.smith@helmholtz-berlin.de
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN
