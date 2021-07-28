@@ -1,6 +1,6 @@
 **bessyii** 
 
-A collection of tools and scripts useful for data collection and analsis at BESSY II
+A collection of tools and scripts useful for data collection and analysis at BESSY II
 
 **Installation**
 
