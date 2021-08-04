@@ -1,4 +1,5 @@
 ophyd==1.6.1
 bluesky==1.7.0
-event_modelfunctools
+msgpack
+event_model
 numpy
