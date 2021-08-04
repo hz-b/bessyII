@@ -1,5 +1,0 @@
-ophyd==1.6.1
-bluesky==1.7.0
-msgpack
-event_model
-numpy
