@@ -12,7 +12,6 @@ bessyii.egg-info/requires.txt
 bessyii.egg-info/top_level.txt
 bessyii/common/__init__.py
 bessyii/common/bluesky_elog.py
-bessyii/common/bluesky_file_export.py
 bessyii/common/bluesky_machine_write.py
 bessyii/plans/__init__.py
 bessyii/plans/flying.py

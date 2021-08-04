@@ -17,7 +17,7 @@ setup(name='bessyii',
       install_requires=[
           'ophyd==1.6.1',
           'bluesky==1.7.0',
-          'event_model'
+          'event_model',
           'functools',
           'numpy'
       ]
