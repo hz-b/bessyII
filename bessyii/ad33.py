@@ -221,6 +221,15 @@ class StatsPluginV33(PluginBase):
     ts_sigma_y = ADCpt(EpicsSignal, 'TS:TSSigmaY')
     ts_total = ADCpt(EpicsSignal, 'TS:TSTotal')
     total = ADCpt(EpicsSignalRO, 'Total_RBV')
+    
+        # Calculate the FWHM 
+    
+    pixel_scaling_x = Cpt(EpicsSignal,'PixelScalingX', name= 'px_scal_x', kind = 'config') 
+    pixel_scaling_y = Cpt(EpicsSignal,'PixelScalingY', name= 'px_scal_y', kind = 'config') 
+    
+    fwhm_x = Cpt(EpicsSignalRO,'FWHMX', name= 'fwhm_x', kind = 'hinted')
+    fwhm_y = Cpt(EpicsSignalRO,'FWHMY', name= 'fwhm_y', kind = 'hinted')
+
 
 
 class QuadEMPort(ADBase):
