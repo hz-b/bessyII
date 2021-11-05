@@ -2,7 +2,29 @@ from getpass import getpass
 import Levenshtein as lev
 
 def requestInvestigationName(username,password):
+    """
+    use a username and password to request all the investigations available to the user, then ask the user to select one
 
+    Parameters
+    ----------
+    username : string
+        the username like qqu
+    password : string
+        the password
+        
+    Returns
+    ------------
+     title, name, id_num, full_name : string, string, string, string
+     
+         title is the title of the investigation
+         
+         name is the investigation id
+         
+         id_num is the eLog id number
+         
+         full_name is the username of the user
+         
+    """
     session_id, full_name = getSessionID(username,password)
     
     if session_id == None:
@@ -13,8 +35,25 @@ def requestInvestigationName(username,password):
     url = 'https://icat.helmholtz-berlin.de/icatplus/catalogue/'+session_id+'/investigation'
     header = {'Content-Type': 'application/json'}
     proxies = {"http": "http://www.bessy.de:3128", "https": "http://www.bessy.de:3128"}
-    response = requests.get(url, headers=header, proxies=proxies)
-    response_data = (json.loads(response.text))
+    
+    code = 403
+    while code != 200:
+        try:
+            response = requests.get(url, headers=header, proxies=proxies)
+            code = response.status_code
+            if code != 200:
+                #assumes that retrying will work and theat the session_id is valid
+                print(f"error code= {code}, retrying")
+                response.raise_for_status()
+
+            elif code == 200:
+                response_data = json.loads(response.text)
+                
+        
+        except:
+             pass
+            
+            
 
 
     #Request the title or some of it, or the investigation id
@@ -60,35 +99,27 @@ from datetime import datetime, timedelta
 from bluesky.callbacks import CallbackBase
 from pprint import pformat
 
-def getInvestigationIDFromTitle(session_id, title_string):
-    url = 'https://icat.helmholtz-berlin.de/icatplus/catalogue/'+session_id+'/investigation'
-    header = {'Content-Type': 'application/json'}
-    proxies = {"http": "http://www.bessy.de:3128", "https": "http://www.bessy.de:3128"}
-    response = requests.get(url, headers=header, proxies=proxies)
-    response_data = (json.loads(response.text))
-    for item in response_data:
-        title = str(item['title'])
-        #Select the id with the title Test: ingest for SISSY
-        if title == title_string:
-            investigation_id = str(item['id'])
-            
-    return investigation_id
-
-def getInvestigationIDFromName(session_id, name_string):
-    url = 'https://icat.helmholtz-berlin.de/icatplus/catalogue/'+session_id+'/investigation'
-    header = {'Content-Type': 'application/json'}
-    proxies = {"http": "http://www.bessy.de:3128", "https": "http://www.bessy.de:3128"}
-    response = requests.get(url, headers=header, proxies=proxies)
-    response_data = (json.loads(response.text))
-    for item in response_data:
-        name = str(item['name'])
-        #Select the id with the title Test: ingest for SISSY
-        if name_string in name:
-            investigation_id = str(item['id'])
-            
-    return investigation_id
-
 def getSessionID(username, password):
+    
+    """
+    use a username and password to get a session id and the full name of the user
+
+    Parameters
+    ----------
+    username : string
+        the username like qqu
+    password : string
+        the password
+        
+    Returns
+    ------------
+     session_id, full_name : string, string
+     
+         session_id is the session id string used to authenticate an eLog session
+         
+         full_name is the username of the user
+         
+    """
     proxies = {"http": "http://www.bessy.de:3128", "https": "http://www.bessy.de:3128"}
     header = {'Content-Type': 'application/json'}
     data = {"plugin":"hzbrex","username":username,"password":password}
@@ -122,6 +153,27 @@ def getSessionID(username, password):
 
 
 def writeToELog(message, username, password, investigation_id ):
+    
+    """
+    use a username and password to write a message to a particular eLog investigation
+
+    Parameters
+    ----------
+    message: string
+        the message to be written    
+    username : string
+        the username like qqu
+    password : string
+        the password
+    investigation_id:
+        the elog investigation id as returned by requestInvestigationName (id_num)
+        
+    Returns
+    ------------
+     response.status_code : int
+         the http response code, 200 is good
+         
+    """
     # make a new comment with the machine tag
     now = datetime.now()-timedelta(hours=2)
 
