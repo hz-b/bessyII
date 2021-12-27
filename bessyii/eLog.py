@@ -152,7 +152,7 @@ def getSessionID(username, password):
              pass
 
 
-def writeToELog(message, username, password, investigation_id ):
+def writeToELog(message, investigation_id, session_id = '9987e109-fc74-4e1d-8d5a-d5e518686534'  ):
     
     """
     use a username and password to write a message to a particular eLog investigation
@@ -161,12 +161,10 @@ def writeToELog(message, username, password, investigation_id ):
     ----------
     message: string
         the message to be written    
-    username : string
-        the username like qqu
-    password : string
-        the password
     investigation_id:
         the elog investigation id as returned by requestInvestigationName (id_num)
+    session_id:
+        used to authenticate. defaults to '9987e109-fc74-4e1d-8d5a-d5e518686534' 
         
     Returns
     ------------
@@ -194,13 +192,10 @@ def writeToELog(message, username, password, investigation_id ):
 
     #get session id
     proxies = {"http": "http://www.bessy.de:3128", "https": "http://www.bessy.de:3128"}
-    session_id, full_name = getSessionID(username,password)
-
     url = 'https://icat.helmholtz-berlin.de/icatplus/logbook/' + session_id + '/investigation/id/'+ str(investigation_id)+ '/event/create'
     header = {'Content-Type': 'application/json'}
     data = html_event_with_tag
     response = requests.post(url, headers=header,data=json.dumps(data), proxies=proxies)
 
     return response.status_code
-
 
