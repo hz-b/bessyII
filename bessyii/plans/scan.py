@@ -23,6 +23,7 @@ from bluesky.utils import Msg
 from bluesky import preprocessors as bpp
 from bluesky import plan_stubs as bps
 
+
 def scan(detectors, *args, num=None, per_step=None, md=None):
     """
     Scan over one multi-motor trajectory. with start and stop metadata
@@ -121,3 +122,52 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
 
     return (yield from scan_nd(detectors, full_cycler,
                                per_step=per_step, md=_md))
+
+
+
+from emiltools.prevac import getSamplesInChamber
+
+
+def scan_s1(detectors, *args, num=None, per_step=None, md=None):
+    """
+    Scan over one multi-motor trajectory. with start and stop metadata
+    
+    additionally add default detectors for the ring, etc
+    
+    Add metadata from the sample in the chamber to the start document
+
+    Parameters
+    ----------
+    detectors : list
+        list of 'readable' objects
+    *args :
+        For one dimension, ``motor, start, stop``.
+        In general:
+
+        .. code-block:: python
+
+            motor1, start1, stop1,
+            motor2, start2, start2,
+            ...,
+            motorN, startN, stopN
+
+        Motors can be any 'settable' object (motor, temp controller, etc.)
+    num : integer
+        number of points
+    per_step : callable, optional
+        hook for customizing action of inner loop (messages per step).
+        See docstring of :func:`bluesky.plan_stubs.one_nd_step` (the default)
+        for details.
+    md : dict, optional
+        metadata
+
+    See Also
+    --------
+    :func:`bluesky.plans.relative_inner_product_scan`
+    :func:`bluesky.plans.grid_scan`
+    :func:`bluesky.plans.scan_nd`
+    """
+    
+    _md={'sample': getSamplesInChamber('ES')[0], 'chamber':'ES'} # take only the first sample
+    _md.update(md)
+    yield from scan(detectors, *args, num=None, per_step=None, md=_md)
