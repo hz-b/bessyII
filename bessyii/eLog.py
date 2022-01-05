@@ -1,4 +1,4 @@
-from emiltools.locks import teardown_my_shell,lock_resource
+from bessyii.locks import teardown_my_shell,lock_resource
 from getpass import getpass
 import Levenshtein as lev
 import requests
@@ -127,7 +127,8 @@ def getSessionID(username, password):
     proxies = {"http": "http://www.bessy.de:3128", "https": "http://www.bessy.de:3128"}
     header = {'Content-Type': 'application/json'}
     data = {"plugin":"hzbrex","username":username,"password":password}
-    
+    session_id = None
+    full_name = None
     code = 403
     while code != 200:
         try:
