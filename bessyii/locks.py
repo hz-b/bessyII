@@ -20,15 +20,16 @@ def teardown_my_shell(RE,lock_list):
     
     if 'user_name' in RE.md:
     
-        user_string = RE.md['user_name'] + ' @IPython_' + str(ipython_session_id) +' @' + RE.md['hostname']
+        user_string = RE.md['user_name'] +" "+ str(ipython_session_id) +' ' + RE.md['hostname']
     else:
     
-        user_string ='IPython_' + str(ipython_session_id) +' @' + RE.md['hostname']
+        user_string =  str(ipython_session_id) +' ' + RE.md['hostname']
     
-    for lock in lock_list:
-        if (lock.free.get() != 1) and (lock.user.get() == user_string):
-            lock.unlock()
-            print(f"Unlocking {lock.name}")
+    if lock_list != None:
+        for lock in lock_list:
+            if (lock.free.get() != 1) and (lock.user.get() == user_string):
+                lock.unlock()
+                print(f"Unlocking {lock.name}")
 
 
 
@@ -48,21 +49,22 @@ def lock_resource(RE,lock_list):
     
     if 'user_name' in RE.md:
     
-        user_string = RE.md['user_name'] + ' @IPython_' + str(ipython_session_id) +' @' + RE.md['hostname']
+        user_string = RE.md['user_name'] + ' ' + str(ipython_session_id) +' ' + RE.md['hostname']
     else:
     
-        user_string ='IPython_' + str(ipython_session_id) +' @' + RE.md['hostname']
+        user_string =str(ipython_session_id) +' ' + RE.md['hostname']
     
-    for lock in lock_list:
-        suspender = SuspendWhenChanged(lock.user, expected_value=user_string, allow_resume=True)
-        RE.install_suspender(suspender)
+    if lock_list != None:
+        for lock in lock_list:
+            suspender = SuspendWhenChanged(lock.user, expected_value=user_string, allow_resume=True)
+            RE.install_suspender(suspender)
 
-        #Take the resource
-        if (lock.free.get() != 1) and (lock.user.get() != user_string):
-            print(f"{lock.name} is in use by {lock.user.get()}, contact them to unlock")
-        else:
-            lock.lock(user_string)
-            print(f"{lock.name} has been locked to {user_string}")
+            #Take the resource
+            if (lock.free.get() != 1) and (lock.user.get() != user_string):
+                print(f"{lock.name} is in use by {lock.user.get()}, contact them to unlock")
+            else:
+                lock.lock(user_string)
+                print(f"{lock.name} has been locked to {user_string}")
 
 
 
