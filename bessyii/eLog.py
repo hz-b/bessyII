@@ -151,7 +151,7 @@ def getSessionID(username, password):
                 
                 session_id = response_data['sessionId']
                 full_name = response_data['fullName']
-                if session_id != None and full_name != None:
+                if session_id and full_name:
                     print(f"SessionID is {session_id}, Full Name is {full_name}")
                     return session_id, full_name
                 else:
