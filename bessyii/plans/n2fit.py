@@ -6,9 +6,10 @@ import warnings
 from lmfit.models import LinearModel, SkewedVoigtModel
 from lmfit import Parameters
 
-from IPython import get_ipython
-#user_ns = get_ipython().user_ns
-#db = user_ns['db']
+#from IPython import get_ipython
+# user_ns = get_ipython().user_ns
+# db = user_ns['db']
+
 
 #search database
 def retrieve_spectra(identifier, motor=None, detector=None):
