@@ -7,11 +7,10 @@ from lmfit.models import LinearModel, SkewedVoigtModel
 from lmfit import Parameters
 
 from IPython import get_ipython
-#user_ns = get_ipython().user_ns
-#db = user_ns['db']
+
 
 #search database
-def retrieve_spectra(identifier, motor=None, detector=None):
+def retrieve_spectra(identifier, motor=None, detector=None,db=None):
     if identifier == 'Jens':
         dat       = np.loadtxt('PETRA_III_P04_N21sF0020_tot_i_deglitched.dat')
         energy    = dat[:, 0]
@@ -110,7 +109,7 @@ def extract_RP_ratio(x,y,params_dict):
     return fwhm, RP
 
 def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True, 
-            vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055 ):
+            vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055):
     # normalize intensity
     norm = np.max(y)
     y = y/norm
@@ -328,8 +327,8 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     return sigma_v2, center_v2,sigma_v2_err, fwhm, RP
     
 def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
-           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055):
-    energy, intensity                  = retrieve_spectra(scan)
+           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, db=None):
+    energy, intensity                  = retrieve_spectra(scan,db=db)
     sigma, center, sigma_err,fwhm,RP2  =_fit_n2(energy, intensity, print_fit_results=print_fit_report, save_img=save_img,fit_data=fit,
                                                 vc1=vc1,amp_sf=amp_sf,sigma=sigma,sigma_min=sigma_min,sigma_max=sigma_max,gamma=gamma)
     if fit == False:
