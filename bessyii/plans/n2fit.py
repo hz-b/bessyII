@@ -111,6 +111,51 @@ def extract_RP_ratio(x,y,params_dict):
     RP         = cen_v3/(fwhm/1000)
     return fwhm, RP
 
+
+##########################
+# functions specific to ela fix params fit_data
+
+# tiny had been numpy.finfo(numpy.float64).eps ~=2.2e16.
+# here, we explicitly set it to 1.e-15 == numpy.finfo(numpy.float64).resolution
+tiny = 1.0e-15
+
+def voigt(x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None):
+    """Return a 1-dimensional Voigt function.
+    voigt(x, amplitude, center, sigma, gamma) =
+        amplitude*wofz(z).real / (sigma*s2pi)
+    For more information, see: https://en.wikipedia.org/wiki/Voigt_profile
+    """
+    if gamma is None:
+        gamma = sigma
+    z = (x-center + 1j*gamma) / max(tiny, (sigma*s2))
+    return amplitude*wofz(z).real / max(tiny, (sigma*s2pi))
+
+def skewed_voigt(x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None, skew=0.0):
+    """Return a Voigt lineshape, skewed with error function.
+    Equal to: voigt(x, center, sigma, gamma)*(1+erf(beta*(x-center)))
+    where ``beta = skew/(sigma*sqrt(2))``
+    with ``skew < 0``: tail to low value of centroid
+         ``skew > 0``: tail to high value of centroid
+    Useful, for example, for ad-hoc Compton scatter profile. For more
+    information, see: https://en.wikipedia.org/wiki/Skew_normal_distribution
+    """
+    beta = skew/max(tiny, (s2*sigma))
+    asym = 1 + erf(beta*(x-center))
+    return asym * voigt(x, amplitude, center, sigma, gamma=gamma)
+
+def ten_svoigt(x, a1,a2,a3,a4,a5,a6,a7,a8,a9,a10, c1,c2,c3,c4,c5,c6,c7,c8,c9,c10, sigma,gamma,skew):
+    tw = skewed_voigt(x,amplitude=a1,  center=c1,  sigma=sigma,  gamma=gamma,  skew=skew) +\
+         skewed_voigt(x,amplitude=a2,  center=c2,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a3,  center=c3,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a4,  center=c4,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a5,  center=c5,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a6,  center=c6,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a7,  center=c7,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a8,  center=c8,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a9,  center=c9,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a10, center=c10, sigma=sigma,  gamma=gamma,  skew=skew)
+    return tw
+
 def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True, 
             vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=False):
     # normalize intensity
@@ -208,6 +253,23 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
             mod = mod + lin_mod   
     
     elif fix_param == True:
+        guess = {'vc1': vc1,                  'amp1':np.max(y)/amp_sf,
+         'vc2': vc1+diff_centers[0],  'amp2':guess_amp(x,y,vc1+diff_centers[0])/amp_sf,
+         'vc3': vc1+diff_centers[1],  'amp3':guess_amp(x,y,vc1+diff_centers[1])/amp_sf,
+         'vc4': vc1+diff_centers[2],  'amp4':guess_amp(x,y,vc1+diff_centers[2])/amp_sf,
+         'vc5': vc1+diff_centers[3],  'amp5':guess_amp(x,y,vc1+diff_centers[3])/amp_sf,
+         'vc6': vc1+diff_centers[4],  'amp6':guess_amp(x,y,vc1+diff_centers[4])/amp_sf,
+         'vc7': vc1+diff_centers[5],  'amp7':guess_amp(x,y,vc1+diff_centers[5])/amp_sf,
+         'vc8': vc1+diff_centers[6],  'amp8':guess_amp(x,y,vc1+diff_centers[6])/amp_sf,
+         'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
+         'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
+        }
+    mod = Model(ten_svoigt)
+    pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
+                        a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
+                        c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
+                        c6=guess['vc6'],c7=guess['vc7'],c8=guess['vc8'],c9=guess['vc9'],c10=guess['vc10'], 
+                        sigma=0.02,gamma=0.055,skew=0)
     
     #################################################################################
     ################################################################################
