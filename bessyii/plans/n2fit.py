@@ -6,6 +6,12 @@ import warnings
 from lmfit.models import LinearModel, SkewedVoigtModel
 from lmfit import Parameters
 
+from numpy import (arctan, copysign, cos, exp, isclose, isnan, log, pi, real,
+                   sin, sqrt, where)
+from scipy.special import erf, erfc
+from scipy.special import gamma as gamfcn
+from scipy.special import wofz
+
 from IPython import get_ipython
 
 
@@ -83,9 +89,6 @@ def extract_RP_fwhm_g(params_dict):
     return sigma_v2, sigma_v2_err,center_v2
     
     
-    
-    
-    
 def extract_RP_ratio(x,y,params_dict):
     '''
     this function calculates the RP following the work
@@ -159,51 +162,52 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
                     'voigt10': ['v10_', guess['vc10'],   guess['vc10']-fwhm, guess['vc10']+fwhm, sigma,  sigma_min,  sigma_max,  guess['amp10'], guess['amp10']/amp_mf,   gamma, gamma_min, 0.0]
                 }
 
-        #for key in dict_fit.keys():
-        #    print (key, dict_fit[key])
-        pars = Parameters()
+            #for key in dict_fit.keys():
+            #    print (key, dict_fit[key])
+            pars = Parameters()
 
 
-        ################################################################################
-        ################################################################################
-        # lin fit
-        lin_mod = LinearModel(prefix='lin_')
-        pars.update(lin_mod.make_params())
-        #
-        pars['lin_slope'].set(value=lin_slope)
-        pars['lin_intercept'].set(value=np.average(y[-10:]))
-        mod = lin_mod
-            
-        for key in list(dict_fit.keys()):
-            model_name       = key
-            prefix_          = dict_fit[key][0]
-            value_center     = dict_fit[key][1]
-            value_center_min = dict_fit[key][2]
-            value_center_max = dict_fit[key][3]
-            value_sigma      = dict_fit[key][4]
-            value_sigma_min  = dict_fit[key][5] 
-            value_sigma_max  = dict_fit[key][6]
-            value_amp        = dict_fit[key][7]
-            value_amp_min    = dict_fit[key][8]
-            value_gamma      = dict_fit[key][9]
-            value_gamma_min  = dict_fit[key][10]
-            value_skew       = dict_fit[key][11]
+            ################################################################################
+            ################################################################################
+            # lin fit
+            lin_mod = LinearModel(prefix='lin_')
+            pars.update(lin_mod.make_params())
+            #
+            pars['lin_slope'].set(value=lin_slope)
+            pars['lin_intercept'].set(value=np.average(y[-10:]))
+            mod = lin_mod
+                
+            for key in list(dict_fit.keys()):
+                model_name       = key
+                prefix_          = dict_fit[key][0]
+                value_center     = dict_fit[key][1]
+                value_center_min = dict_fit[key][2]
+                value_center_max = dict_fit[key][3]
+                value_sigma      = dict_fit[key][4]
+                value_sigma_min  = dict_fit[key][5] 
+                value_sigma_max  = dict_fit[key][6]
+                value_amp        = dict_fit[key][7]
+                value_amp_min    = dict_fit[key][8]
+                value_gamma      = dict_fit[key][9]
+                value_gamma_min  = dict_fit[key][10]
+                value_skew       = dict_fit[key][11]
 
-            fit = config_SkewedVoigtModel(model_name, prefix_, 
-                                        value_center, value_center_min, value_center_max, 
-                                        value_sigma, value_sigma_min, value_sigma_max, 
-                                        value_amp, value_amp_min, 
-                                        value_gamma, value_gamma_min, 
-                                        value_skew, 
-                                        pars)
-            if key == 'voigt1':
-                mod = fit
-            else:
-                mod = mod + fit
+                fit = config_SkewedVoigtModel(model_name, prefix_, 
+                                            value_center, value_center_min, value_center_max, 
+                                            value_sigma, value_sigma_min, value_sigma_max, 
+                                            value_amp, value_amp_min, 
+                                            value_gamma, value_gamma_min, 
+                                            value_skew, 
+                                            pars)
+                if key == 'voigt1':
+                    mod = fit
+                else:
+                    mod = mod + fit
 
 
-        mod = mod + lin_mod   
+            mod = mod + lin_mod   
     
+    elif fix_param == True:
     
     #################################################################################
     ################################################################################
