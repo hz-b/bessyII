@@ -6,13 +6,15 @@ import warnings
 from lmfit.models import LinearModel, SkewedVoigtModel
 from lmfit import Parameters
 
-<<<<<<< HEAD
+from numpy import (arctan, copysign, cos, exp, isclose, isnan, log, pi, real,
+                   sin, sqrt, where)
+from scipy.special import erf, erfc
+from scipy.special import gamma as gamfcn
+from scipy.special import wofz
+
+
 from IPython import get_ipython
-=======
-#from IPython import get_ipython
-# user_ns = get_ipython().user_ns
-# db = user_ns['db']
->>>>>>> 5597f54ae1f0746a075a2ae715371b32fa824a27
+
 
 
 #search database
@@ -89,9 +91,6 @@ def extract_RP_fwhm_g(params_dict):
     return sigma_v2, sigma_v2_err,center_v2
     
     
-    
-    
-    
 def extract_RP_ratio(x,y,params_dict):
     '''
     this function calculates the RP following the work
@@ -114,8 +113,53 @@ def extract_RP_ratio(x,y,params_dict):
     RP         = cen_v3/(fwhm/1000)
     return fwhm, RP
 
+
+##########################
+# functions specific to ela fix params fit_data
+
+# tiny had been numpy.finfo(numpy.float64).eps ~=2.2e16.
+# here, we explicitly set it to 1.e-15 == numpy.finfo(numpy.float64).resolution
+tiny = 1.0e-15
+
+def voigt(x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None):
+    """Return a 1-dimensional Voigt function.
+    voigt(x, amplitude, center, sigma, gamma) =
+        amplitude*wofz(z).real / (sigma*s2pi)
+    For more information, see: https://en.wikipedia.org/wiki/Voigt_profile
+    """
+    if gamma is None:
+        gamma = sigma
+    z = (x-center + 1j*gamma) / max(tiny, (sigma*s2))
+    return amplitude*wofz(z).real / max(tiny, (sigma*s2pi))
+
+def skewed_voigt(x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None, skew=0.0):
+    """Return a Voigt lineshape, skewed with error function.
+    Equal to: voigt(x, center, sigma, gamma)*(1+erf(beta*(x-center)))
+    where ``beta = skew/(sigma*sqrt(2))``
+    with ``skew < 0``: tail to low value of centroid
+         ``skew > 0``: tail to high value of centroid
+    Useful, for example, for ad-hoc Compton scatter profile. For more
+    information, see: https://en.wikipedia.org/wiki/Skew_normal_distribution
+    """
+    beta = skew/max(tiny, (s2*sigma))
+    asym = 1 + erf(beta*(x-center))
+    return asym * voigt(x, amplitude, center, sigma, gamma=gamma)
+
+def ten_svoigt(x, a1,a2,a3,a4,a5,a6,a7,a8,a9,a10, c1,c2,c3,c4,c5,c6,c7,c8,c9,c10, sigma,gamma,skew):
+    tw = skewed_voigt(x,amplitude=a1,  center=c1,  sigma=sigma,  gamma=gamma,  skew=skew) +\
+         skewed_voigt(x,amplitude=a2,  center=c2,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a3,  center=c3,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a4,  center=c4,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a5,  center=c5,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a6,  center=c6,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a7,  center=c7,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a8,  center=c8,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a9,  center=c9,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         skewed_voigt(x,amplitude=a10, center=c10, sigma=sigma,  gamma=gamma,  skew=skew)
+    return tw
+
 def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True, 
-            vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055):
+            vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=False):
     # normalize intensity
     norm = np.max(y)
     y = y/norm
@@ -138,77 +182,96 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     if vc1 == 'auto':
         vc1 = find_first_max(x,y, fwhm)
    
-    guess = {'vc1': vc1,                  'amp1':np.max(y)/amp_sf,
-             'vc2': vc1+diff_centers[0],  'amp2':guess_amp(x,y,vc1+diff_centers[0])/amp_sf,
-             'vc3': vc1+diff_centers[1],  'amp3':guess_amp(x,y,vc1+diff_centers[1])/amp_sf,
-             'vc4': vc1+diff_centers[2],  'amp4':guess_amp(x,y,vc1+diff_centers[2])/amp_sf,
-             'vc5': vc1+diff_centers[3],  'amp5':guess_amp(x,y,vc1+diff_centers[3])/amp_sf,
-             'vc6': vc1+diff_centers[4],  'amp6':guess_amp(x,y,vc1+diff_centers[4])/amp_sf,
-             'vc7': vc1+diff_centers[5],  'amp7':guess_amp(x,y,vc1+diff_centers[5])/amp_sf,
-             'vc8': vc1+diff_centers[6],  'amp8':guess_amp(x,y,vc1+diff_centers[6])/amp_sf,
-             'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
-             'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
-            }
-    #for key in guess.keys():
-    #    print (key, guess[key])
-    #                    'prefix_', value_center,    center_min,         center_max,         sigma,  sigma_min,  sigma_max,  amp,           amp_min, gamma, skew]
-    dict_fit = {'voigt1': ['v1_',   guess['vc1'],    guess['vc1']-fwhm,  guess['vc1']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp1'],  guess['amp1']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt2': ['v2_',   guess['vc2'],    guess['vc2']-fwhm,  guess['vc2']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp2'],  guess['amp2']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt3': ['v3_',   guess['vc3'],    guess['vc3']-fwhm,  guess['vc3']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp3'],  guess['amp3']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt4': ['v4_',   guess['vc4'],    guess['vc4']-fwhm,  guess['vc4']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp4'],  guess['amp4']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt5': ['v5_',   guess['vc5'],    guess['vc5']-fwhm,  guess['vc5']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp5'],  guess['amp5']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt6': ['v6_',   guess['vc6'],    guess['vc6']-fwhm,  guess['vc6']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp6'],  guess['amp6']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt7': ['v7_',   guess['vc7'],    guess['vc7']-fwhm,  guess['vc7']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp7'],  guess['amp7']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt8': ['v8_',   guess['vc8'],    guess['vc8']-fwhm,  guess['vc8']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp8'],  guess['amp8']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt9': ['v9_',   guess['vc9'],    guess['vc9']-fwhm,  guess['vc9']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp9'],  guess['amp9']/amp_mf,   gamma, gamma_min, 0.0],
-                'voigt10': ['v10_', guess['vc10'],   guess['vc10']-fwhm, guess['vc10']+fwhm, sigma,  sigma_min,  sigma_max,  guess['amp10'], guess['amp10']/amp_mf,   gamma, gamma_min, 0.0]
-               }
+    if fix_param == False:
+        guess = {'vc1': vc1,                  'amp1':np.max(y)/amp_sf,
+                'vc2': vc1+diff_centers[0],  'amp2':guess_amp(x,y,vc1+diff_centers[0])/amp_sf,
+                'vc3': vc1+diff_centers[1],  'amp3':guess_amp(x,y,vc1+diff_centers[1])/amp_sf,
+                'vc4': vc1+diff_centers[2],  'amp4':guess_amp(x,y,vc1+diff_centers[2])/amp_sf,
+                'vc5': vc1+diff_centers[3],  'amp5':guess_amp(x,y,vc1+diff_centers[3])/amp_sf,
+                'vc6': vc1+diff_centers[4],  'amp6':guess_amp(x,y,vc1+diff_centers[4])/amp_sf,
+                'vc7': vc1+diff_centers[5],  'amp7':guess_amp(x,y,vc1+diff_centers[5])/amp_sf,
+                'vc8': vc1+diff_centers[6],  'amp8':guess_amp(x,y,vc1+diff_centers[6])/amp_sf,
+                'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
+                'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
+                }
+        #for key in guess.keys():
+        #    print (key, guess[key])
+        #                    'prefix_', value_center,    center_min,         center_max,         sigma,  sigma_min,  sigma_max,  amp,           amp_min, gamma, skew]
+        dict_fit = {'voigt1': ['v1_',   guess['vc1'],    guess['vc1']-fwhm,  guess['vc1']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp1'],  guess['amp1']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt2': ['v2_',   guess['vc2'],    guess['vc2']-fwhm,  guess['vc2']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp2'],  guess['amp2']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt3': ['v3_',   guess['vc3'],    guess['vc3']-fwhm,  guess['vc3']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp3'],  guess['amp3']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt4': ['v4_',   guess['vc4'],    guess['vc4']-fwhm,  guess['vc4']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp4'],  guess['amp4']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt5': ['v5_',   guess['vc5'],    guess['vc5']-fwhm,  guess['vc5']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp5'],  guess['amp5']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt6': ['v6_',   guess['vc6'],    guess['vc6']-fwhm,  guess['vc6']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp6'],  guess['amp6']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt7': ['v7_',   guess['vc7'],    guess['vc7']-fwhm,  guess['vc7']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp7'],  guess['amp7']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt8': ['v8_',   guess['vc8'],    guess['vc8']-fwhm,  guess['vc8']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp8'],  guess['amp8']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt9': ['v9_',   guess['vc9'],    guess['vc9']-fwhm,  guess['vc9']+fwhm,  sigma,  sigma_min,  sigma_max,  guess['amp9'],  guess['amp9']/amp_mf,   gamma, gamma_min, 0.0],
+                    'voigt10': ['v10_', guess['vc10'],   guess['vc10']-fwhm, guess['vc10']+fwhm, sigma,  sigma_min,  sigma_max,  guess['amp10'], guess['amp10']/amp_mf,   gamma, gamma_min, 0.0]
+                }
 
-    #for key in dict_fit.keys():
-    #    print (key, dict_fit[key])
-    pars = Parameters()
-
-
-    ################################################################################
-    ################################################################################
-    # lin fit
-    lin_mod = LinearModel(prefix='lin_')
-    pars.update(lin_mod.make_params())
-    #
-    pars['lin_slope'].set(value=lin_slope)
-    pars['lin_intercept'].set(value=np.average(y[-10:]))
-    mod = lin_mod
-        
-    for key in list(dict_fit.keys()):
-        model_name       = key
-        prefix_          = dict_fit[key][0]
-        value_center     = dict_fit[key][1]
-        value_center_min = dict_fit[key][2]
-        value_center_max = dict_fit[key][3]
-        value_sigma      = dict_fit[key][4]
-        value_sigma_min  = dict_fit[key][5] 
-        value_sigma_max  = dict_fit[key][6]
-        value_amp        = dict_fit[key][7]
-        value_amp_min    = dict_fit[key][8]
-        value_gamma      = dict_fit[key][9]
-        value_gamma_min  = dict_fit[key][10]
-        value_skew       = dict_fit[key][11]
-
-        fit = config_SkewedVoigtModel(model_name, prefix_, 
-                                      value_center, value_center_min, value_center_max, 
-                                      value_sigma, value_sigma_min, value_sigma_max, 
-                                      value_amp, value_amp_min, 
-                                      value_gamma, value_gamma_min, 
-                                      value_skew, 
-                                      pars)
-        if key == 'voigt1':
-            mod = fit
-        else:
-            mod = mod + fit
+            #for key in dict_fit.keys():
+            #    print (key, dict_fit[key])
+            pars = Parameters()
 
 
-    mod = mod + lin_mod   
+            ################################################################################
+            ################################################################################
+            # lin fit
+            lin_mod = LinearModel(prefix='lin_')
+            pars.update(lin_mod.make_params())
+            #
+            pars['lin_slope'].set(value=lin_slope)
+            pars['lin_intercept'].set(value=np.average(y[-10:]))
+            mod = lin_mod
+                
+            for key in list(dict_fit.keys()):
+                model_name       = key
+                prefix_          = dict_fit[key][0]
+                value_center     = dict_fit[key][1]
+                value_center_min = dict_fit[key][2]
+                value_center_max = dict_fit[key][3]
+                value_sigma      = dict_fit[key][4]
+                value_sigma_min  = dict_fit[key][5] 
+                value_sigma_max  = dict_fit[key][6]
+                value_amp        = dict_fit[key][7]
+                value_amp_min    = dict_fit[key][8]
+                value_gamma      = dict_fit[key][9]
+                value_gamma_min  = dict_fit[key][10]
+                value_skew       = dict_fit[key][11]
+
+                fit = config_SkewedVoigtModel(model_name, prefix_, 
+                                            value_center, value_center_min, value_center_max, 
+                                            value_sigma, value_sigma_min, value_sigma_max, 
+                                            value_amp, value_amp_min, 
+                                            value_gamma, value_gamma_min, 
+                                            value_skew, 
+                                            pars)
+                if key == 'voigt1':
+                    mod = fit
+                else:
+                    mod = mod + fit
+
+
+            mod = mod + lin_mod   
     
+    elif fix_param == True:
+        guess = {'vc1': vc1,                  'amp1':np.max(y)/amp_sf,
+         'vc2': vc1+diff_centers[0],  'amp2':guess_amp(x,y,vc1+diff_centers[0])/amp_sf,
+         'vc3': vc1+diff_centers[1],  'amp3':guess_amp(x,y,vc1+diff_centers[1])/amp_sf,
+         'vc4': vc1+diff_centers[2],  'amp4':guess_amp(x,y,vc1+diff_centers[2])/amp_sf,
+         'vc5': vc1+diff_centers[3],  'amp5':guess_amp(x,y,vc1+diff_centers[3])/amp_sf,
+         'vc6': vc1+diff_centers[4],  'amp6':guess_amp(x,y,vc1+diff_centers[4])/amp_sf,
+         'vc7': vc1+diff_centers[5],  'amp7':guess_amp(x,y,vc1+diff_centers[5])/amp_sf,
+         'vc8': vc1+diff_centers[6],  'amp8':guess_amp(x,y,vc1+diff_centers[6])/amp_sf,
+         'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
+         'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
+        }
+    mod = Model(ten_svoigt)
+    pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
+                        a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
+                        c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
+                        c6=guess['vc6'],c7=guess['vc7'],c8=guess['vc8'],c9=guess['vc9'],c10=guess['vc10'], 
+                        sigma=0.02,gamma=0.055,skew=0)
     
     #################################################################################
     ################################################################################
@@ -333,10 +396,11 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     return sigma_v2, center_v2,sigma_v2_err, fwhm, RP
     
 def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
-           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, db=None):
+           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, db=None, fix_param = False):
     energy, intensity                  = retrieve_spectra(scan,db=db)
     sigma, center, sigma_err,fwhm,RP2  =_fit_n2(energy, intensity, print_fit_results=print_fit_report, save_img=save_img,fit_data=fit,
-                                                vc1=vc1,amp_sf=amp_sf,sigma=sigma,sigma_min=sigma_min,sigma_max=sigma_max,gamma=gamma)
+                                                vc1=vc1,amp_sf=amp_sf,sigma=sigma,sigma_min=sigma_min,sigma_max=sigma_max,gamma=gamma,
+                                                fix_param=fix_param)
     if fit == False:
         return
     fwhm_g                             = 2*sigma*np.sqrt(2*np.log(2))
