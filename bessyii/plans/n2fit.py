@@ -6,7 +6,13 @@ import warnings
 from lmfit.models import LinearModel, SkewedVoigtModel
 from lmfit import Parameters
 
+<<<<<<< HEAD
 from IPython import get_ipython
+=======
+#from IPython import get_ipython
+# user_ns = get_ipython().user_ns
+# db = user_ns['db']
+>>>>>>> 5597f54ae1f0746a075a2ae715371b32fa824a27
 
 
 #search database
