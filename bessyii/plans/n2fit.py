@@ -3,7 +3,7 @@ from matplotlib.ticker import MultipleLocator, FixedLocator, FormatStrFormatter
 import numpy as np
 import warnings
 
-from lmfit.models import LinearModel, SkewedVoigtModel
+from lmfit.models import LinearModel, SkewedVoigtModel, Model
 from lmfit import Parameters
 
 from numpy import (arctan, copysign, cos, exp, isclose, isnan, log, pi, real,
@@ -120,7 +120,8 @@ def extract_RP_ratio(x,y,params_dict):
 # tiny had been numpy.finfo(numpy.float64).eps ~=2.2e16.
 # here, we explicitly set it to 1.e-15 == numpy.finfo(numpy.float64).resolution
 tiny = 1.0e-15
-
+s2   = sqrt(2)
+s2pi = sqrt(2*pi)
 def voigt(x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None):
     """Return a 1-dimensional Voigt function.
     voigt(x, amplitude, center, sigma, gamma) =
@@ -160,6 +161,7 @@ def ten_svoigt(x, a1,a2,a3,a4,a5,a6,a7,a8,a9,a10, c1,c2,c3,c4,c5,c6,c7,c8,c9,c10
 
 def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True, 
             vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=False):
+    fix_param = True
     # normalize intensity
     norm = np.max(y)
     y = y/norm
@@ -209,52 +211,53 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
                     'voigt10': ['v10_', guess['vc10'],   guess['vc10']-fwhm, guess['vc10']+fwhm, sigma,  sigma_min,  sigma_max,  guess['amp10'], guess['amp10']/amp_mf,   gamma, gamma_min, 0.0]
                 }
 
-            #for key in dict_fit.keys():
-            #    print (key, dict_fit[key])
-            pars = Parameters()
+        #for key in dict_fit.keys():
+        #    print (key, dict_fit[key])
+        pars = Parameters()
 
 
-            ################################################################################
-            ################################################################################
-            # lin fit
-            lin_mod = LinearModel(prefix='lin_')
-            pars.update(lin_mod.make_params())
-            #
-            pars['lin_slope'].set(value=lin_slope)
-            pars['lin_intercept'].set(value=np.average(y[-10:]))
-            mod = lin_mod
+        ################################################################################
+        ################################################################################
+        # lin fit
+        lin_mod = LinearModel(prefix='lin_')
+        pars.update(lin_mod.make_params())
+        #
+        pars['lin_slope'].set(value=lin_slope)
+        pars['lin_intercept'].set(value=np.average(y[-10:]))
+        mod = lin_mod
                 
-            for key in list(dict_fit.keys()):
-                model_name       = key
-                prefix_          = dict_fit[key][0]
-                value_center     = dict_fit[key][1]
-                value_center_min = dict_fit[key][2]
-                value_center_max = dict_fit[key][3]
-                value_sigma      = dict_fit[key][4]
-                value_sigma_min  = dict_fit[key][5] 
-                value_sigma_max  = dict_fit[key][6]
-                value_amp        = dict_fit[key][7]
-                value_amp_min    = dict_fit[key][8]
-                value_gamma      = dict_fit[key][9]
-                value_gamma_min  = dict_fit[key][10]
-                value_skew       = dict_fit[key][11]
+        for key in list(dict_fit.keys()):
+            model_name       = key
+            prefix_          = dict_fit[key][0]
+            value_center     = dict_fit[key][1]
+            value_center_min = dict_fit[key][2]
+            value_center_max = dict_fit[key][3]
+            value_sigma      = dict_fit[key][4]
+            value_sigma_min  = dict_fit[key][5] 
+            value_sigma_max  = dict_fit[key][6]
+            value_amp        = dict_fit[key][7]
+            value_amp_min    = dict_fit[key][8]
+            value_gamma      = dict_fit[key][9]
+            value_gamma_min  = dict_fit[key][10]
+            value_skew       = dict_fit[key][11]
 
-                fit = config_SkewedVoigtModel(model_name, prefix_, 
-                                            value_center, value_center_min, value_center_max, 
-                                            value_sigma, value_sigma_min, value_sigma_max, 
-                                            value_amp, value_amp_min, 
-                                            value_gamma, value_gamma_min, 
-                                            value_skew, 
-                                            pars)
-                if key == 'voigt1':
-                    mod = fit
-                else:
-                    mod = mod + fit
+            fit = config_SkewedVoigtModel(model_name, prefix_, 
+                                        value_center, value_center_min, value_center_max, 
+                                        value_sigma, value_sigma_min, value_sigma_max, 
+                                        value_amp, value_amp_min, 
+                                        value_gamma, value_gamma_min, 
+                                        value_skew, 
+                                        pars)
+            if key == 'voigt1':
+                mod = fit
+            else:
+                mod = mod + fit
 
 
-            mod = mod + lin_mod   
+        mod = mod + lin_mod   
     
     elif fix_param == True:
+        print('Using fixed parameters fit')
         guess = {'vc1': vc1,                  'amp1':np.max(y)/amp_sf,
          'vc2': vc1+diff_centers[0],  'amp2':guess_amp(x,y,vc1+diff_centers[0])/amp_sf,
          'vc3': vc1+diff_centers[1],  'amp3':guess_amp(x,y,vc1+diff_centers[1])/amp_sf,
@@ -266,8 +269,8 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
          'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
          'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
         }
-    mod = Model(ten_svoigt)
-    pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
+        mod = Model(ten_svoigt)
+        pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
                         a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
                         c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
                         c6=guess['vc6'],c7=guess['vc7'],c8=guess['vc8'],c9=guess['vc9'],c10=guess['vc10'], 
@@ -334,11 +337,20 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     axes[1].plot(x, y)
 
     counter = 0
-    for i in dict_fit.values():
-        counter += 1
-        axes[1].plot(x, comps[i[0]], '--', label='Voigt component ' + str(counter))
+    print ('comps', comps)
+    if fix_param == False:
+        for i in dict_fit.values():
+            counter += 1
+            axes[1].plot(x, comps[i[0]], '--', label='Voigt component ' + str(counter))
+        axes[1].plot(x, comps['lin_'], '--', label='Linear component')
+    elif fix_param == True:
+        for i in range(10):
+            print(i)
+            print(comps['ten_svoigt'][i])
+            counter += 1
+            axes[1].plot(x,skewed_voigt(x, amplitude=comps['ten_svoigt'][i], center=comps['ten_svoigt'][10+i], sigma=comps['ten_svoigt'][-3], gamma=comps['ten_svoigt'][-2], skew=comps['ten_svoigt'][-1]), '--', label='Voigt component ' + str(counter))
 
-    axes[1].plot(x, comps['lin_'], '--', label='Linear component')
+    
 
     axes[1].legend()
     axes[1].set_xlabel('Photon energy (eV)')
