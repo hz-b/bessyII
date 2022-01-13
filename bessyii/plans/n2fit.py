@@ -84,31 +84,52 @@ def find_first_max(x,y,fwhm):
         #print('vcl',vcl)
     return vc1
 
-def extract_RP_fwhm_g(params_dict):
-    sigma_v2      = params_dict['v2_sigma'].value
-    sigma_v2_err  = params_dict['v2_sigma'].stderr
-    center_v2     = params_dict['v2_center'].value
+def extract_RP_fwhm_g(params_dict, fix_param=False):
+    if fix_param == False:
+        sigma_v2      = params_dict['v2_sigma'].value
+        sigma_v2_err  = params_dict['v2_sigma'].stderr
+        center_v2     = params_dict['v2_center'].value
+    if fix_param == True:
+        sigma_v2      = params_dict['sigma']
+        sigma_v2_err  = 0
+        center_v2     = params_dict['c2']
+        
     return sigma_v2, sigma_v2_err,center_v2
     
     
-def extract_RP_ratio(x,y,params_dict):
+def extract_RP_ratio(x,y,params_dict, fix_param=False):
     '''
     this function calculates the RP following the work
     of Chen and Sette: https://doi.org/10.1063/1.1141044
     '''
-    cen_v1   = params_dict['v1_center'].value
-    cen_v2   = params_dict['v2_center'].value
-    cen_v3   = params_dict['v3_center'].value 
+    if fix_param == False:
+        cen_v1   = params_dict['v1_center'].value
+        cen_v2   = params_dict['v2_center'].value
+        cen_v3   = params_dict['v3_center'].value 
 
-    ind_cen_v1 = find_nearest_idx(x, cen_v1)
-    ind_cen_v2 = find_nearest_idx(x, cen_v2)
-    ind_cen_v3 = find_nearest_idx(x, cen_v3)
-    cen_valley = x[np.argmin(y[ind_cen_v1:ind_cen_v2])]
-    bg_v3      = params_dict['lin_slope']*cen_v3+params_dict['lin_intercept']
-    bg_valley  = params_dict['lin_slope']*cen_valley+params_dict['lin_intercept']
-    amp_v3     = y[ind_cen_v3]-bg_v3
-    amp_valley = np.min(y[ind_cen_v1:ind_cen_v2])-bg_valley
-    warnings.filterwarnings('ignore', 'invalid value encountered in sqrt')
+        ind_cen_v1 = find_nearest_idx(x, cen_v1)
+        ind_cen_v2 = find_nearest_idx(x, cen_v2)
+        ind_cen_v3 = find_nearest_idx(x, cen_v3)
+        cen_valley = x[np.argmin(y[ind_cen_v1:ind_cen_v2])]
+        bg_v3      = params_dict['lin_slope']*cen_v3+params_dict['lin_intercept']
+        bg_valley  = params_dict['lin_slope']*cen_valley+params_dict['lin_intercept']
+        amp_v3     = y[ind_cen_v3]-bg_v3
+        amp_valley = np.min(y[ind_cen_v1:ind_cen_v2])-bg_valley
+        warnings.filterwarnings('ignore', 'invalid value encountered in sqrt')
+    if fix_param == True:
+        cen_v1   = params_dict['c1']
+        cen_v2   = params_dict['c2']
+        cen_v3   = params_dict['c3'] 
+
+        ind_cen_v1 = find_nearest_idx(x, cen_v1)
+        ind_cen_v2 = find_nearest_idx(x, cen_v2)
+        ind_cen_v3 = find_nearest_idx(x, cen_v3)
+        cen_valley = x[np.argmin(y[ind_cen_v1:ind_cen_v2])]
+        #bg_v3      = params_dict['lin_slope']*cen_v3+params_dict['lin_intercept']
+        #bg_valley  = params_dict['lin_slope']*cen_valley+params_dict['lin_intercept']
+        amp_v3     = y[ind_cen_v3]#-bg_v3
+        amp_valley = np.min(y[ind_cen_v1:ind_cen_v2])#-bg_valley
+        warnings.filterwarnings('ignore', 'invalid value encountered in sqrt')
     fwhm       = np.sqrt(amp_v3**2-amp_valley**2) # in meV
     RP         = cen_v3/(fwhm/1000)
     return fwhm, RP
@@ -161,7 +182,6 @@ def ten_svoigt(x, a1,a2,a3,a4,a5,a6,a7,a8,a9,a10, c1,c2,c3,c4,c5,c6,c7,c8,c9,c10
 
 def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True, 
             vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=False):
-    fix_param = True
     # normalize intensity
     norm = np.max(y)
     y = y/norm
@@ -329,7 +349,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     axes[0].yaxis.set_minor_locator(YminorLocator)
     axes[0].tick_params(which='minor',axis='both',direction='in',length=3,top=True,right=True)
     #
-    comps = out.eval_components(x=x)
+    
     #
     ################################################################################
     # axes 1
@@ -337,18 +357,19 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     axes[1].plot(x, y)
 
     counter = 0
-    print ('comps', comps)
+
     if fix_param == False:
+        comps = out.eval_components(x=x)
         for i in dict_fit.values():
             counter += 1
             axes[1].plot(x, comps[i[0]], '--', label='Voigt component ' + str(counter))
         axes[1].plot(x, comps['lin_'], '--', label='Linear component')
     elif fix_param == True:
-        for i in range(10):
-            print(i)
-            print(comps['ten_svoigt'][i])
+        comps = out.values
+        for i in range(1,11):
+            ind=str(i)
             counter += 1
-            axes[1].plot(x,skewed_voigt(x, amplitude=comps['ten_svoigt'][i], center=comps['ten_svoigt'][10+i], sigma=comps['ten_svoigt'][-3], gamma=comps['ten_svoigt'][-2], skew=comps['ten_svoigt'][-1]), '--', label='Voigt component ' + str(counter))
+            axes[1].plot(x,skewed_voigt(x, amplitude=comps['a'+ind], center=comps['c'+ind], sigma=comps['sigma'], gamma=comps['gamma'], skew=comps['skew']), '--', label='Voigt component ' + str(counter))
 
     
 
@@ -400,10 +421,12 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     plt.show()
     #extracting values to calculate RP
     
-        
-    sigma_v2, sigma_v2_err,center_v2 = extract_RP_fwhm_g(out.params)
-    fwhm, RP = extract_RP_ratio(x, out.best_fit,out.params)
-    
+    if fix_param == False:    
+        sigma_v2, sigma_v2_err,center_v2 = extract_RP_fwhm_g(out.params,fix_param=fix_param)
+        fwhm, RP = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)
+    elif fix_param == True:    
+        sigma_v2, sigma_v2_err,center_v2 = extract_RP_fwhm_g(out.values,fix_param=fix_param)
+        fwhm, RP = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)    
     
     return sigma_v2, center_v2,sigma_v2_err, fwhm, RP
     
@@ -424,8 +447,8 @@ def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save
     print('Estimation of the fwhm from fit parameters:')
     if sigma_err != None:
         fwhm_g_err    = 2*sigma_err*np.sqrt(2*np.log(2))
-        RP_err       = center/ fwhm_g_err
-        print('FWHM_g', np.round(fwhm_g*1000,2),'+/-', RP_err, ' meV')
+        #RP_err       = center/ fwhm_g_err
+        print('FWHM_g', np.round(fwhm_g*1000,2))#,'+/-', RP_err, ' meV')
     else:
         print('FWHM_g', np.round(fwhm_g*1000,2), ' meV')
     print('The transition is at ', np.round(center,2), ' eV')
