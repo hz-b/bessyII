@@ -137,7 +137,7 @@ def extract_RP_ratio(x,y,params_dict, fix_param=False):
         amp_v3     = y[ind_cen_v3]#-bg_v3
         amp_valley = np.min(y[ind_cen_v1:ind_cen_v2])#-bg_valley
         warnings.filterwarnings('ignore', 'invalid value encountered in sqrt')
-    vp_ratio = amp_v3/amp_valley
+    vp_ratio = amp_valley/amp_v3
     return vp_ratio
 
 
@@ -296,11 +296,17 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
          'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
         }
         mod = Model(ten_svoigt)
+        mod.set_param_hint('gamma', value=gamma, vary=False)
+        mod.set_param_hint('skew', value=0.0, vary=False)
+        for i in range(1,11):
+            mod.set_param_hint('a'+str(i), min=0, max=2*guess['amp'+str(i)])
+            mod.set_param_hint('c'+str(i), min=guess['vc'+str(i)]-0.05, max=guess['vc'+str(i)]+0.05)
         pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
                         a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
                         c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
                         c6=guess['vc6'],c7=guess['vc7'],c8=guess['vc8'],c9=guess['vc9'],c10=guess['vc10'], 
-                        sigma=0.02,gamma=0.055,skew=0)
+                        sigma=0.02,skew=0)
+
     
     #################################################################################
     ################################################################################
@@ -325,9 +331,8 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     #t1.start()
     out = mod.fit(y, pars, x=x)
     #t1.stop()
-    #if print_fit_results == True:
-    #    print('the fit took ', t1)
-    #    print(out.fit_report(min_correl=0.5))
+    if print_fit_results == True:
+        print(out.fit_report(min_correl=0.5))
     
     ####
     # axes 0
