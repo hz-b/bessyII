@@ -32,8 +32,15 @@ def retrieve_spectra(identifier, motor=None, detector=None,db=None):
         spectra   = run.primary.read()
         energy    = np.array(spectra[motor])
         intensity = np.array(spectra[detector])
+        
+        energy,intensity = remove_neg_values(energy,intensity)
     return energy, intensity
 
+def remove_neg_values(x,y):
+    ind = np.where(y < 0)
+    x = np.delete(x,ind[0])
+    y = np.delete(y,ind[0])
+    return x,y
 
 def config_SkewedVoigtModel(model_name, prefix_, value_center, value_center_min, value_center_max, value_sigma, value_sigma_min, value_sigma_max, value_amp, value_amp_min, value_gamma, value_gamma_min, value_skew, pars):
 
@@ -130,9 +137,8 @@ def extract_RP_ratio(x,y,params_dict, fix_param=False):
         amp_v3     = y[ind_cen_v3]#-bg_v3
         amp_valley = np.min(y[ind_cen_v1:ind_cen_v2])#-bg_valley
         warnings.filterwarnings('ignore', 'invalid value encountered in sqrt')
-    fwhm       = np.sqrt(amp_v3**2-amp_valley**2) # in meV
-    RP         = cen_v3/(fwhm/1000)
-    return fwhm, RP
+    vp_ratio = amp_v3/amp_valley
+    return vp_ratio
 
 
 ##########################
@@ -309,6 +315,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
         fig, axes = plt.subplots(1, 1, figsize=(8.0, 16.0))
         axes.plot(x, init, 'orange' ,label='initial guess')
         axes.scatter(x, y, label='data')
+        #axes.set_ylim(-.05,1.1)
         return None,None,None,None,None
     
     
@@ -423,17 +430,17 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     
     if fix_param == False:    
         sigma_v2, sigma_v2_err,center_v2 = extract_RP_fwhm_g(out.params,fix_param=fix_param)
-        fwhm, RP = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)
+        vp_ratio = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)
     elif fix_param == True:    
         sigma_v2, sigma_v2_err,center_v2 = extract_RP_fwhm_g(out.values,fix_param=fix_param)
-        fwhm, RP = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)    
+        vp_ratio = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)    
     
-    return sigma_v2, center_v2,sigma_v2_err, fwhm, RP
+    return sigma_v2, center_v2,sigma_v2_err, vp_ratio
     
 def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
            vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, db=None, fix_param = False):
     energy, intensity                  = retrieve_spectra(scan,db=db)
-    sigma, center, sigma_err,fwhm,RP2  =_fit_n2(energy, intensity, print_fit_results=print_fit_report, save_img=save_img,fit_data=fit,
+    sigma, center, sigma_err,vp_ratio  =_fit_n2(energy, intensity, print_fit_results=print_fit_report, save_img=save_img,fit_data=fit,
                                                 vc1=vc1,amp_sf=amp_sf,sigma=sigma,sigma_min=sigma_min,sigma_max=sigma_max,gamma=gamma,
                                                 fix_param=fix_param)
     if fit == False:
@@ -455,9 +462,9 @@ def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save
     print('The estimated RP is:', np.round(RP,0),'\n')
     
     print('Estimation of the fwhm from 3rd-peak to 1st-valley ratio:')
-    if np.isnan(RP2):
+    if np.isnan(vp_ratio):
         print('Not Possible')
     else:
-        print('FWHM_g', np.round(fwhm,2), ' meV')
-        print('The estimated RP is:', np.round(RP2,0))
-    return RP, RP2
+        print('The valley/peak ratio is', np.round(vp_ratio,2))
+
+    return RP, vp_ratio
