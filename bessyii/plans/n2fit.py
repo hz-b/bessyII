@@ -15,7 +15,16 @@ from scipy.special import wofz
 
 from IPython import get_ipython
 
+'''
+from .base import *
+from bessyii.plans.n2fit import fit_n2 as fit_n2_internal
 
+def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
+           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=True):
+    RP, vp_ratio=fit_n2_internal(scan, motor, detector,print_fit_report, save_img, fit,
+           vc1, amp_sf,sigma, sigma_min,sigma_max,gamma,db=db, fix_param=fix_param)
+    return RP, vp_ratio
+'''
 
 #search database
 def retrieve_spectra(identifier, motor=None, detector=None,db=None):
@@ -95,13 +104,13 @@ def extract_RP_fwhm_g(params_dict, fix_param=False):
     if fix_param == False:
         sigma_v2      = params_dict['v2_sigma'].value
         sigma_v2_err  = params_dict['v2_sigma'].stderr
-        center_v2     = params_dict['v2_center'].value
+        center_v1     = params_dict['v1_center'].value
     if fix_param == True:
         sigma_v2      = params_dict['sigma']
         sigma_v2_err  = 0
-        center_v2     = params_dict['c2']
+        center_v1     = params_dict['c1']
         
-    return sigma_v2, sigma_v2_err,center_v2
+    return sigma_v2, sigma_v2_err,center_v1
     
     
 def extract_RP_ratio(x,y,params_dict, fix_param=False):
@@ -142,7 +151,7 @@ def extract_RP_ratio(x,y,params_dict, fix_param=False):
 
 
 ##########################
-# functions specific to ela fix params fit_data
+# functions specific to fix params fit_data
 
 # tiny had been numpy.finfo(numpy.float64).eps ~=2.2e16.
 # here, we explicitly set it to 1.e-15 == numpy.finfo(numpy.float64).resolution
@@ -173,19 +182,21 @@ def skewed_voigt(x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None, skew=0.0):
     asym = 1 + erf(beta*(x-center))
     return asym * voigt(x, amplitude, center, sigma, gamma=gamma)
 
-def ten_svoigt(x, a1,a2,a3,a4,a5,a6,a7,a8,a9,a10, c1,c2,c3,c4,c5,c6,c7,c8,c9,c10, sigma,gamma,skew):
+def n2_model(x, a1,a2,a3,a4,a5,a6,a7, c1,c2,c3,c4,c5,c6,c7, sigma,gamma,skew):
     tw = skewed_voigt(x,amplitude=a1,  center=c1,  sigma=sigma,  gamma=gamma,  skew=skew) +\
          skewed_voigt(x,amplitude=a2,  center=c2,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          skewed_voigt(x,amplitude=a3,  center=c3,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          skewed_voigt(x,amplitude=a4,  center=c4,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          skewed_voigt(x,amplitude=a5,  center=c5,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          skewed_voigt(x,amplitude=a6,  center=c6,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-         skewed_voigt(x,amplitude=a7,  center=c7,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-         skewed_voigt(x,amplitude=a8,  center=c8,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-         skewed_voigt(x,amplitude=a9,  center=c9,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-         skewed_voigt(x,amplitude=a10, center=c10, sigma=sigma,  gamma=gamma,  skew=skew)
+         skewed_voigt(x,amplitude=a7,  center=c7,  sigma=sigma,  gamma=gamma,  skew=skew)
+         
+         #skewed_voigt(x,amplitude=a8,  center=c8,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         #skewed_voigt(x,amplitude=a9,  center=c9,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+         #skewed_voigt(x,amplitude=a10, center=c10, sigma=sigma,  gamma=gamma,  skew=skew)
     return tw
 
+# internal fit routine
 def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True, 
             vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=False):
     # normalize intensity
@@ -207,6 +218,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     fwhm      = 2.355*sigma*2
     lin_slope = 0.0000001
     #vc1 = 'auto'
+    
     if vc1 == 'auto':
         vc1 = find_first_max(x,y, fwhm)
    
@@ -295,19 +307,33 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
          'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
          'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
         }
-        mod = Model(ten_svoigt)
+        
+        pars = Parameters()
+        # lin fit
+        lin_mod = LinearModel(prefix='lin_')
+        pars.update(lin_mod.make_params())
+        #
+        pars['lin_slope'].set(value=lin_slope)
+        pars['lin_intercept'].set(value=np.average(y[-10:]))
+
+                
+        mod = Model(n2_model) + lin_mod
+       # pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
+       #                 a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
+       #                 c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
+       #                 c6=guess['vc6'],c7=guess['vc7'],c8=guess['vc8'],c9=guess['vc9'],c10=guess['vc10'], 
+       #                 sigma=0.02,gamma=0.055,skew=0)
         pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
-                        a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
+                        a6=guess['amp6'],a7=guess['amp7'], 
                         c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
-                        c6=guess['vc6'],c7=guess['vc7'],c8=guess['vc8'],c9=guess['vc9'],c10=guess['vc10'], 
-                        sigma=0.02,gamma=0.055,skew=0)
+                        c6=guess['vc6'],c7=guess['vc7'], 
+                        sigma=0.02,gamma=0.055,skew=0, lin_slope=lin_slope, lin_intercept=np.average(y[-10:]))
     
     #################################################################################
     ################################################################################
     # 
     init = mod.eval(pars, x=x)
-    #print('init', init)
-    #out = mod.fit(y, pars, x=x)
+
 
     # here it plots the intial guesses if fit=False
     if fit_data == False:
@@ -325,9 +351,8 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     #t1.start()
     out = mod.fit(y, pars, x=x)
     #t1.stop()
-    #if print_fit_results == True:
-    #    print('the fit took ', t1)
-    #    print(out.fit_report(min_correl=0.5))
+    if print_fit_results == True:
+        print(out.fit_report(min_correl=0.5))
     
     ####
     # axes 0
@@ -373,7 +398,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
         axes[1].plot(x, comps['lin_'], '--', label='Linear component')
     elif fix_param == True:
         comps = out.values
-        for i in range(1,11):
+        for i in range(1,8):
             ind=str(i)
             counter += 1
             axes[1].plot(x,skewed_voigt(x, amplitude=comps['a'+ind], center=comps['c'+ind], sigma=comps['sigma'], gamma=comps['gamma'], skew=comps['skew']), '--', label='Voigt component ' + str(counter))
@@ -419,8 +444,8 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     xmin_ax2, xmax_ax2 = axes[2].axes.get_xlim()
     ymin_ax2, ymax_ax2 = axes[2].axes.get_ylim()
 
-    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.2)+ymin_ax2, f'RMS initial = {str(np.round(RMS(residuals_inital),3))}') #, style = 'italic',fontsize = 30,  color = "green")
-    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.15)+ymin_ax2, f'RMS final   = {str(np.round(RMS(residuals_final),3))}')
+    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.2)+ymin_ax2, f'RMS initial = {str(np.round(RMS(residuals_inital),4))}') #, style = 'italic',fontsize = 30,  color = "green")
+    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.15)+ymin_ax2, f'RMS final   = {str(np.round(RMS(residuals_final),4))}')
 
     plt.subplots_adjust(left=0.14, bottom=None, right=None, top=None, wspace=0.04, hspace=0.14)
     if save_img != False:
@@ -429,39 +454,36 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     #extracting values to calculate RP
     
     if fix_param == False:    
-        sigma_v2, sigma_v2_err,center_v2 = extract_RP_fwhm_g(out.params,fix_param=fix_param)
+        sigma_v2, sigma_v2_err,center_v1 = extract_RP_fwhm_g(out.params,fix_param=fix_param)
         vp_ratio = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)
     elif fix_param == True:    
-        sigma_v2, sigma_v2_err,center_v2 = extract_RP_fwhm_g(out.values,fix_param=fix_param)
+        sigma_v2, sigma_v2_err,center_v1 = extract_RP_fwhm_g(out.values,fix_param=fix_param)
         vp_ratio = extract_RP_ratio(x, out.best_fit,out.params,fix_param=fix_param)    
     
-    return sigma_v2, center_v2,sigma_v2_err, vp_ratio
+    return sigma_v2, center_v1,sigma_v2_err, vp_ratio
     
 def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
-           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, db=None, fix_param = False):
+           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.0563, db=None, fix_param = False):
     energy, intensity                  = retrieve_spectra(scan,db=db)
     sigma, center, sigma_err,vp_ratio  =_fit_n2(energy, intensity, print_fit_results=print_fit_report, save_img=save_img,fit_data=fit,
                                                 vc1=vc1,amp_sf=amp_sf,sigma=sigma,sigma_min=sigma_min,sigma_max=sigma_max,gamma=gamma,
                                                 fix_param=fix_param)
     if fit == False:
         return
-    fwhm_g                             = 2*sigma*np.sqrt(2*np.log(2))
-    RP                                 = center/ fwhm_g
-    pi_print                           = u'\U0001D6D1'
+    fwhm_g         = 2*sigma*np.sqrt(2*np.log(2))
+    fwhm_l         = 2*gamma
+    RP             = center/ fwhm_g
+    pi_print       = u'\U0001D6D1'
     print('The Resolving Power (RP) is obtained by calculating the')
     print('gaussian contribution to the FWHM of the N2:1s-->'+pi_print+'* transition.')
-    print('If possible the FWHM is calculated with two methods\n')
-    print('Estimation of the fwhm from fit parameters:')
-    if sigma_err != None:
-        fwhm_g_err    = 2*sigma_err*np.sqrt(2*np.log(2))
-        #RP_err       = center/ fwhm_g_err
-        print('FWHM_g', np.round(fwhm_g*1000,2))#,'+/-', RP_err, ' meV')
-    else:
-        print('FWHM_g', np.round(fwhm_g*1000,2), ' meV')
-    print('The transition is at ', np.round(center,2), ' eV')
+    print('Estimation of the gaussian FWHM from fit parameters, assuming a fixed Lorentizian FWHM:')
+    print('FWHM_g', np.round(fwhm_g*1000,2), ' meV')
+    print('FWHM_l', np.round(fwhm_l*1000,2), ' meV')
     print('The estimated RP is:', np.round(RP,0),'\n')
+    print('The first peak is at ', np.round(center,2), ' eV', 'the literature values is 400.8 meV')
+    print('The energy shift is ', np.round(center-400.8,2) , ' eV\n')
     
-    print('Estimation of the fwhm from 3rd-peak to 1st-valley ratio:')
+    print('Estimation of the 3rd-peak to 1st-valley ratio:')
     if np.isnan(vp_ratio):
         print('Not Possible')
     else:
