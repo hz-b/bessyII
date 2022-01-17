@@ -145,13 +145,17 @@ def getSessionID(username, password):
                 print(f"error code= {code}, retrying")
                 response.raise_for_status()
 
-            else:
+            elif code == 200:
                 
                 response_data = json.loads(response.text)
                 
                 session_id = response_data['sessionId']
                 full_name = response_data['fullName']
-                return session_id, full_name
+                if session_id and full_name:
+                    print(f"SessionID is {session_id}, Full Name is {full_name}")
+                    return session_id, full_name
+                else:
+                    print("Error requesting session ID. Response is None. Retrying")
         
         except:
              pass
