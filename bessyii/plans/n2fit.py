@@ -182,7 +182,7 @@ def skewed_voigt(x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None, skew=0.0):
     asym = 1 + erf(beta*(x-center))
     return asym * voigt(x, amplitude, center, sigma, gamma=gamma)
 
-def ten_svoigt(x, a1,a2,a3,a4,a5,a6,a7, c1,c2,c3,c4,c5,c6,c7, sigma,gamma,skew):
+def n2_model(x, a1,a2,a3,a4,a5,a6,a7, c1,c2,c3,c4,c5,c6,c7, sigma,gamma,skew):
     tw = skewed_voigt(x,amplitude=a1,  center=c1,  sigma=sigma,  gamma=gamma,  skew=skew) +\
          skewed_voigt(x,amplitude=a2,  center=c2,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          skewed_voigt(x,amplitude=a3,  center=c3,  sigma=sigma,  gamma=gamma,  skew=skew)+\
@@ -190,6 +190,7 @@ def ten_svoigt(x, a1,a2,a3,a4,a5,a6,a7, c1,c2,c3,c4,c5,c6,c7, sigma,gamma,skew):
          skewed_voigt(x,amplitude=a5,  center=c5,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          skewed_voigt(x,amplitude=a6,  center=c6,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          skewed_voigt(x,amplitude=a7,  center=c7,  sigma=sigma,  gamma=gamma,  skew=skew)
+         
          #skewed_voigt(x,amplitude=a8,  center=c8,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          #skewed_voigt(x,amplitude=a9,  center=c9,  sigma=sigma,  gamma=gamma,  skew=skew)+\
          #skewed_voigt(x,amplitude=a10, center=c10, sigma=sigma,  gamma=gamma,  skew=skew)
@@ -217,6 +218,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     fwhm      = 2.355*sigma*2
     lin_slope = 0.0000001
     #vc1 = 'auto'
+    
     if vc1 == 'auto':
         vc1 = find_first_max(x,y, fwhm)
    
@@ -305,7 +307,17 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
          'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
          'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
         }
-        mod = Model(ten_svoigt)
+        
+        pars = Parameters()
+        # lin fit
+        lin_mod = LinearModel(prefix='lin_')
+        pars.update(lin_mod.make_params())
+        #
+        pars['lin_slope'].set(value=lin_slope)
+        pars['lin_intercept'].set(value=np.average(y[-10:]))
+
+                
+        mod = Model(n2_model) + lin_mod
        # pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
        #                 a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
        #                 c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
@@ -315,7 +327,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
                         a6=guess['amp6'],a7=guess['amp7'], 
                         c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
                         c6=guess['vc6'],c7=guess['vc7'], 
-                        sigma=0.02,gamma=0.055,skew=0)
+                        sigma=0.02,gamma=0.055,skew=0, lin_slope=lin_slope, lin_intercept=np.average(y[-10:]))
     
     #################################################################################
     ################################################################################
@@ -432,8 +444,8 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     xmin_ax2, xmax_ax2 = axes[2].axes.get_xlim()
     ymin_ax2, ymax_ax2 = axes[2].axes.get_ylim()
 
-    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.2)+ymin_ax2, f'RMS initial = {str(np.round(RMS(residuals_inital),3))}') #, style = 'italic',fontsize = 30,  color = "green")
-    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.15)+ymin_ax2, f'RMS final   = {str(np.round(RMS(residuals_final),3))}')
+    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.2)+ymin_ax2, f'RMS initial = {str(np.round(RMS(residuals_inital),4))}') #, style = 'italic',fontsize = 30,  color = "green")
+    axes[2].text(((xmax_ax2-xmin_ax2)*0.55)+xmin_ax2, ((ymax_ax2-ymin_ax2)*0.15)+ymin_ax2, f'RMS final   = {str(np.round(RMS(residuals_final),4))}')
 
     plt.subplots_adjust(left=0.14, bottom=None, right=None, top=None, wspace=0.04, hspace=0.14)
     if save_img != False:
