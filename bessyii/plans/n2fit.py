@@ -15,7 +15,16 @@ from scipy.special import wofz
 
 from IPython import get_ipython
 
+'''
+from .base import *
+from bessyii.plans.n2fit import fit_n2 as fit_n2_internal
 
+def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
+           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=True):
+    RP, vp_ratio=fit_n2_internal(scan, motor, detector,print_fit_report, save_img, fit,
+           vc1, amp_sf,sigma, sigma_min,sigma_max,gamma,db=db, fix_param=fix_param)
+    return RP, vp_ratio
+'''
 
 #search database
 def retrieve_spectra(identifier, motor=None, detector=None,db=None):
