@@ -146,7 +146,7 @@ def extract_RP_ratio(x,y,params_dict, fix_param=False):
         amp_v3     = y[ind_cen_v3]#-bg_v3
         amp_valley = np.min(y[ind_cen_v1:ind_cen_v2])#-bg_valley
         warnings.filterwarnings('ignore', 'invalid value encountered in sqrt')
-    vp_ratio = amp_v3/amp_valley
+    vp_ratio = amp_valley/amp_v3
     return vp_ratio
 
 
@@ -360,7 +360,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     fig, axes = plt.subplots(3, 1, figsize=(8.0, 16.0))
     #
     # initial fit
-    axes[0].plot(x, out.init_fit, 'orange' ,label='data1')
+    axes[0].plot(x, out.init_fit, 'orange' ,label='initial guess')
     #
     axes[0].scatter(x, y, label='data')
     #axes[0].plot(x, init, '--', label='initial fit')
