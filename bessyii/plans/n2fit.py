@@ -350,7 +350,7 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
 
     #t1.start()
     out = mod.fit(y, pars, x=x)
-    #t1.stop()
+    delta = out.eval_uncertainty(x=x)
     if print_fit_results == True:
         print(out.fit_report(min_correl=0.5))
     
@@ -362,9 +362,11 @@ def _fit_n2(x,y, print_fit_results=False, save_img=False,fit_data=True,
     # initial fit
     axes[0].plot(x, out.init_fit, 'orange' ,label='initial guess')
     #
-    axes[0].scatter(x, y, label='data')
+    axes[0].scatter(x, y, label='data', s=10)
     #axes[0].plot(x, init, '--', label='initial fit')
     axes[0].plot(x, out.best_fit, 'r', label='best fit')
+    axes[0].fill_between(x,out.best_fit-delta,out.best_fit+delta,color='gray',alpha=0.4, label='fit uncertainty')
+
 
     axes[0].legend()
     axes[0].set_xlabel('Photon energy (eV)')
