@@ -1,4 +1,3 @@
-
 import sys
 import inspect
 from itertools import chain, zip_longest
@@ -22,6 +21,7 @@ from bluesky.utils import Msg
 
 from bluesky import preprocessors as bpp
 from bluesky import plan_stubs as bps
+
 
 def scan(detectors, *args, num=None, per_step=None, md=None):
     """
@@ -121,3 +121,5 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
 
     return (yield from scan_nd(detectors, full_cycler,
                                per_step=per_step, md=_md))
+
+
