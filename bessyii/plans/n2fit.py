@@ -84,21 +84,22 @@ def guess_amp(x,y,vc):
     return amp
 
 def find_first_max(x,y,fwhm):
-    vc1_ind = np.argmax(y)
-    vc1     = x[vc1_ind]
     step    = x[1]-x[0]
-    ind     = int(fwhm/step/1) # /4 required because above  multiply FWHM *2, and we need only half FWHM
-    #print('vc1,vc1_ind,step, ind', vc1,vc1_ind,step, ind)
-    vcl     = y[int(vc1_ind-ind)]
-    #print('vcl',vcl)
-    while vcl >= 0.7:
-        #print ('vcl too high, I recalculate')
-        vc1_ind = np.argmax(y[0:vc1_ind])
-        vc1     = x[vc1_ind]
-        vcl     = y[int(vc1_ind-ind)]
-        #print('newind',vc1_ind)
-        #print('vcl',vcl)
-    return vc1
+    ind     = int(fwhm/step/1) 
+    n_steps = int(x.shape[0]/ind)
+    for i in range(n_steps):
+        if i == 0:
+            amax    = np.max(y[i*ind:i*ind+ind])
+            argmax  = np.argmax(y[i*ind:i*ind+ind])
+        else:
+            tmax    = np.max(y[i*ind:i*ind+ind])
+            targmax = np.argmax(y[i*ind:i*ind+ind]) +i*ind
+            if tmax <= amax and amax > 0.8:
+                break
+            if tmax >= amax:
+                amax = tmax
+                argmax = targmax           
+    return x[argmax]
 
 def extract_RP_fwhm_g(params_dict, fix_param=False):
     if fix_param == False:
