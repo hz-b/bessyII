@@ -12,7 +12,57 @@ from bluesky.utils import (
 )
 
 from ophyd import Signal
-  
+
+
+def create_command_string_for_flyscan(detectors, motor_name, start, stop, vel):
+    """
+    Create a string to attach to the metadata with the command used
+    to start the scan
+
+    Parameters
+    ----------
+    detectors : list
+        list of 'readable' objects
+    *args :
+        For one dimension, ``motor, start, stop``.
+        In general:
+
+        .. code-block:: python
+
+            motor1, start1, stop1,
+            motor2, start2, start2,
+            ...,
+            motorN, startN, stopN
+
+        Motors can be any 'settable' object (motor, temp controller, etc.)
+    num : integer
+        number of points
+    
+    Returns
+    ----------
+    command: a string representing the scan command
+
+    Tested for
+    --------
+    :func:`bluesky.plans.scan`
+    """
+    try:
+        # detectors
+        detector_names = [det.name for det in detectors]
+        detector_names_string = '['
+        for d in detector_names:
+            detector_names_string += d + ','
+        detector_names_string = detector_names_string[0:-1] + ']'
+
+        #motors, motor positions and number of points
+        n_motors = int(len(args)/4)
+        motors_string = ', '+motor_name +', '+str(start)+', '+str(stop)+', vel='+str(vel)
+        command = 'flyscan('+detector_names_string+motors_string+')'
+    except:
+        command = 'It was not possible to create this entry'
+    return command
+
+
 def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=None):
     
     """
@@ -61,7 +111,7 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=N
     md_args = [repr(motor),start,stop,vel,del_req]
     x_fields = []
     x_fields.extend(getattr(motor, 'hints', {}).get('fields', []))
-
+    command_elog = create_command_string_for_flyscan(detectors, flyer.name, start, stop, vel)
     _md = {'detectors': [det.name for det in detectors],
            'motors': x_fields,
            'plan_args': {'detectors': list(map(repr, detectors)),
@@ -74,6 +124,7 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=N
                          },
 
            'plan_name': 'flycount',
+           'command_elog' : command_elog,
            'hints': {},
        }
     _md.update(md or {})
