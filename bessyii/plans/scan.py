@@ -87,7 +87,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
     # new
     detector_names = [det.name for det in detectors]
     detector_names_string = '['
-    for d in detector names:
+    for d in detector_names:
         detector_names_string += d + ','
     detector_names_string = ']'
     elog_comment = 'scan('+detector_names+')'
@@ -98,7 +98,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
            'plan_pattern': 'inner_product',
            'plan_pattern_module': plan_patterns.__name__,
            'plan_pattern_args': dict(num=num, args=md_args),
-           'motors': motor_names
+           'motors': motor_names,
            'elog_comment' : elog_comment
            }
     _md.update(md)
