@@ -90,7 +90,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
     for d in detector_names:
         detector_names_string += d + ','
     detector_names_string = ']'
-    elog_comment = 'scan('+detector_names+')'
+    elog_comment = 'scan('+detector_names_string+')'
     _md = {'plan_args': {'detectors': list(map(repr, detectors)),
                          'num': num, 'args': md_args_dict,
                          'per_step': repr(per_step)},
