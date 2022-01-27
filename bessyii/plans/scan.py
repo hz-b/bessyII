@@ -84,6 +84,13 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
     motor_names = tuple(motor.name for motor, start, stop
                         in partition(3, args))
     md = md or {}
+    # new
+    detector_names = [det.name for det in detectors]
+    detector_names_string = '['
+    for d in detector names:
+        detector_names_string += d + ','
+    detector_names_string = ']'
+    elog_comment = 'scan('+detector_names+')'
     _md = {'plan_args': {'detectors': list(map(repr, detectors)),
                          'num': num, 'args': md_args_dict,
                          'per_step': repr(per_step)},
@@ -92,6 +99,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
            'plan_pattern_module': plan_patterns.__name__,
            'plan_pattern_args': dict(num=num, args=md_args),
            'motors': motor_names
+           'elog_comment' : elog_comment
            }
     _md.update(md)
 
