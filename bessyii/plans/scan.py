@@ -22,6 +22,56 @@ from bluesky.utils import Msg
 from bluesky import preprocessors as bpp
 from bluesky import plan_stubs as bps
 
+def create_command_string_for_scan(detectors, motor_names, args, num):
+    """
+    Create a string to attach to the metadata with the command used
+    to start the scan
+
+    Parameters
+    ----------
+    detectors : list
+        list of 'readable' objects
+    *args :
+        For one dimension, ``motor, start, stop``.
+        In general:
+
+        .. code-block:: python
+
+            motor1, start1, stop1,
+            motor2, start2, start2,
+            ...,
+            motorN, startN, stopN
+
+        Motors can be any 'settable' object (motor, temp controller, etc.)
+    num : integer
+        number of points
+    
+    Returns
+    ----------
+    command: a string representing the scan command
+
+    Tested for
+    --------
+    :func:`bluesky.plans.scan`
+    """
+    try:
+        # detectors
+        detector_names = [det.name for det in detectors]
+        detector_names_string = '['
+        for d in detector_names:
+            detector_names_string += d + ','
+        detector_names_string = detector_names_string[0:-1] + ']'
+
+        #motors, motor positions and number of points
+        n_motors = int(len(args)/3)
+        motors_string = ', '
+        for n in range(n_motors):
+            motors_string += motor_names[n] +', '+str(args[1+n*3])+', '+str(args[2+n*3])+', '
+        motors_string += str(num)
+        command = 'scan('+detector_names_string+motors_string+')'
+    except:
+        command = 'It was not possible to create this entry'
+    return command
 
 def scan(detectors, *args, num=None, per_step=None, md=None):
     """
@@ -84,13 +134,9 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
     motor_names = tuple(motor.name for motor, start, stop
                         in partition(3, args))
     md = md or {}
-    # new
-    detector_names = [det.name for det in detectors]
-    detector_names_string = '['
-    for d in detector_names:
-        detector_names_string += d + ','
-    detector_names_string = ']'
-    elog_comment = 'scan('+detector_names_string+')'
+    
+    command = create_command_string_for_scan(detectors, motor_names, args, num)
+    
     _md = {'plan_args': {'detectors': list(map(repr, detectors)),
                          'num': num, 'args': md_args_dict,
                          'per_step': repr(per_step)},
@@ -99,7 +145,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
            'plan_pattern_module': plan_patterns.__name__,
            'plan_pattern_args': dict(num=num, args=md_args),
            'motors': motor_names,
-           'elog_comment' : elog_comment
+           'command' : command
            }
     _md.update(md)
 
