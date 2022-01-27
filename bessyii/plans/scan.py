@@ -135,7 +135,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
                         in partition(3, args))
     md = md or {}
     
-    command = create_command_string_for_scan(detectors, motor_names, args, num)
+    command_elog = create_command_string_for_scan(detectors, motor_names, args, num)
     
     _md = {'plan_args': {'detectors': list(map(repr, detectors)),
                          'num': num, 'args': md_args_dict,
@@ -145,7 +145,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
            'plan_pattern_module': plan_patterns.__name__,
            'plan_pattern_args': dict(num=num, args=md_args),
            'motors': motor_names,
-           'command' : command
+           'command_elog' : command_elog
            }
     _md.update(md)
 
