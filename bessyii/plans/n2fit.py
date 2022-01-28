@@ -15,16 +15,6 @@ from scipy.special import wofz
 
 from IPython import get_ipython
 
-'''
-from .base import *
-from bessyii.plans.n2fit import fit_n2 as fit_n2_internal
-
-def fit_n2(scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
-           vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=True):
-    RP, vp_ratio=fit_n2_internal(scan, motor, detector,print_fit_report, save_img, fit,
-           vc1, amp_sf,sigma, sigma_min,sigma_max,gamma,db=db, fix_param=fix_param)
-    return RP, vp_ratio
-'''
 
 class N2_fit:
     """
@@ -44,13 +34,37 @@ class N2_fit:
     """
     def __init__(self, db):
         self._db = db
+        self.tiny = 1.0e-15
+        self.s2   = sqrt(2)
+        self.s2pi = sqrt(2*pi)
         
-    #search database
     def retrieve_spectra(self, identifier, motor=None, detector=None):
+        """
+        Retrieve the motor and detector values from one scan
+
+        Parameters
+        ----------
+        identifier : negative int or string
+            for the last scan -1
+            or use the db indentifier
+            'Jens': if available it loads the data from P04,
+            the old beamline of J.Viefhaus
+        motor : string
+            the motor and axis name connected by a _
+            for instance m1.tx would be m1_tx
+        detector : string
+            the detector to retrieve, if more than one detector was used
+            in the scan and we don't want to use the first one
+
+        Return
+        --------
+        x,y : np.array
+            two arrays containing motor and detector values
+        """
         if identifier == 'Jens':
             dat       = np.loadtxt('PETRA_III_P04_N21sF0020_tot_i_deglitched.dat')
-            energy    = dat[:, 0]
-            intensity = dat[:, 1]
+            x    = dat[:, 0]
+            y = dat[:, 1]
         else:
             run       = self._db[identifier]
             if detector == None:
@@ -58,20 +72,71 @@ class N2_fit:
             if motor == None:
                 motor = run.metadata['start']['motors'][0]
             spectra   = run.primary.read()
-            energy    = np.array(spectra[motor])
-            intensity = np.array(spectra[detector])
+            x    = np.array(spectra[motor])
+            y = np.array(spectra[detector])
 
-            energy,intensity = self.remove_neg_values(energy,intensity)
-        return energy, intensity
+            x,y = self.remove_neg_values(x,y)
+        return x, y
 
     def remove_neg_values(self, x,y):
+        """
+        Remove negative values from y and corresponding values from x
+
+        Parameters
+        ----------
+        x : numpy.array
+        y : numpy.array
+
+        Return
+        --------
+        x,y : np.array
+            two arrays without negative values
+        """
         ind = np.where(y < 0)
         x = np.delete(x,ind[0])
         y = np.delete(y,ind[0])
         return x,y
 
     def config_SkewedVoigtModel(self, model_name, prefix_, value_center, value_center_min, value_center_max, value_sigma, value_sigma_min, value_sigma_max, value_amp, value_amp_min, value_gamma, value_gamma_min, value_skew, pars):
+        """
+        Configure a SkewdVoigtModel to be used in the fit when fix_parameters = False
 
+        Parameters
+        ----------
+        model_name : string
+             the name of the model
+        prefix_    : string
+             the name of the skewdvoigt peak
+        value_center: float
+             the center of the peak
+        value_center_min: float
+             the lower bound for the center of the peak for the fit routine
+        value_center_max: float
+             the upper bound for the center of the peak for the fit routine
+        value_sigma: float
+             the sigma of the gaussian component of the voigt peak
+        value_sigma_min: float
+             the lower bound for the sigma for the fit routine
+        value_sigma_max: float
+             the upper bound for the sigma for the fit routine
+        value_amp: float
+             the value for the amplitude of the peak
+        value_amp_min: float
+             the lower bound for the amplitude for the fit routine
+        value_gamma: float
+             the gamma value for the loretzian component of the voigt peak
+        value_gamma_min: float
+             the lower bound for the gamma for the fit routine
+        value_skew: float
+             the skew parameter for the voigt peak (defines peak asimmetry)
+        pars: lmfit parameter class of a model
+
+
+        Return
+        --------
+        x,y : np.array
+            two arrays without negative values
+        """
         locals()[model_name] = SkewedVoigtModel(prefix=prefix_)   
         return_model_name = locals()[model_name]
 
@@ -86,6 +151,19 @@ class N2_fit:
 
 
     def RMS(self, data_):
+        """
+        Calculates Root Mean Square from residuals of a fit
+
+        Parameters
+        ----------
+        data_ : numpy.array
+             residuals
+
+
+        Return
+        --------
+        rms : np.array
+        """
         sum_data = 0
         for i in data_:
             sum_data = sum_data + i**2          
@@ -93,16 +171,63 @@ class N2_fit:
         return rms
 
     def find_nearest_idx(self, array, value):
+        """
+        Find the index of the values in array closer to value
+
+        Parameters
+        ----------
+        array : numpy.array
+        value : int or float     
+
+
+        Return
+        --------
+        idx : int
+        """
         array = np.asarray(array)
         idx = (np.abs(array - value)).argmin()
         return idx
 
     def guess_amp(self, x,y,vc):
+        """
+        Guess the amplitude for to input in skewd voigt model starting from
+        real data x and y, at the value of x closer to vc
+
+        Parameters
+        ----------
+        x : numpy.array
+        y : numpy.array
+        vc : int or float     
+
+
+        Return
+        --------
+        amp : float
+        """
         idx = self.find_nearest_idx(x,vc)
         amp = y[idx]
         return amp
 
     def find_first_max(self, x,y,fwhm):
+        """
+        Finds the first max in a Nitrogen spectra. The routine performs a window scan 
+        of the array starting from left of the array until two conditions are met:
+            the new max values < old max value
+            old max value > 0.8
+
+        Parameters
+        ----------
+        x : numpy.array
+        y : numpy.array
+        fwhm : float
+             the fwhm of the nitrogen peak, used to decide how
+             wide the scan window is
+
+        Return
+        --------
+        idy : int
+             the position of the first max in x
+        """
         step    = x[1]-x[0]
         ind     = int(fwhm/step/1) 
         n_steps = int(x.shape[0]/ind)
@@ -121,6 +246,22 @@ class N2_fit:
         return x[argmax]
 
     def extract_RP_fwhm_g(self, params_dict, fix_param=False):
+        """
+        Extracts the sigma of the first peak, if available the error on it 
+        and the center of the first peak from the parameters dictionary created
+        by lmfit after a fit. 
+
+        Parameters
+        ----------
+        params_dict : lmfit parameter dictionary
+        fix_param : boolean
+             True if the routine with fixed parameters is being used
+             otherwise False
+
+        Return
+        --------
+        sigma_v2, sigma_v2_err,center_v1 : float,float,float
+        """
         if fix_param == False:
             sigma_v2      = params_dict['v2_sigma'].value
             sigma_v2_err  = params_dict['v2_sigma'].stderr
@@ -134,10 +275,25 @@ class N2_fit:
 
 
     def extract_RP_ratio(self, x,y,params_dict, fix_param=False):
-        '''
-        this function calculates the RP following the work
-        of Chen and Sette: https://doi.org/10.1063/1.1141044
-        '''
+        """
+        this function calculates the 3rd valley over 1st peak ratio ratio 
+        (see Chen and Sette: https://doi.org/10.1063/1.1141044)
+
+        Parameters
+        ----------
+        x : numpy.array
+             the motor position array
+        y : numpy.array
+              the detector readings array
+        params_dict : lmfit parameter dictionary
+        fix_param : boolean
+             True if the routine with fixed parameters is being used
+             otherwise False
+
+        Return
+        --------
+        vp_ratio: float
+        """
         if fix_param == False:
             cen_v1   = params_dict['v1_center'].value
             cen_v2   = params_dict['v2_center'].value
@@ -157,9 +313,9 @@ class N2_fit:
             cen_v2   = params_dict['c2']
             cen_v3   = params_dict['c3'] 
 
-            ind_cen_v1 = find_nearest_idx(x, cen_v1)
-            ind_cen_v2 = find_nearest_idx(x, cen_v2)
-            ind_cen_v3 = find_nearest_idx(x, cen_v3)
+            ind_cen_v1 = self.find_nearest_idx(x, cen_v1)
+            ind_cen_v2 = self.find_nearest_idx(x, cen_v2)
+            ind_cen_v3 = self.find_nearest_idx(x, cen_v3)
             cen_valley = x[np.argmin(y[ind_cen_v1:ind_cen_v2])]
             #bg_v3      = params_dict['lin_slope']*cen_v3+params_dict['lin_intercept']
             #bg_valley  = params_dict['lin_slope']*cen_valley+params_dict['lin_intercept']
@@ -175,9 +331,7 @@ class N2_fit:
 
     # tiny had been numpy.finfo(numpy.float64).eps ~=2.2e16.
     # here, we explicitly set it to 1.e-15 == numpy.finfo(numpy.float64).resolution
-    tiny = 1.0e-15
-    s2   = sqrt(2)
-    s2pi = sqrt(2*pi)
+
     def voigt(self, x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None):
         """Return a 1-dimensional Voigt function.
         voigt(x, amplitude, center, sigma, gamma) =
@@ -186,8 +340,8 @@ class N2_fit:
         """
         if gamma is None:
             gamma = sigma
-        z = (x-center + 1j*gamma) / max(tiny, (sigma*s2))
-        return amplitude*wofz(z).real / max(tiny, (sigma*s2pi))
+        z = (x-center + 1j*gamma) / max(self.tiny, (sigma*self.s2))
+        return amplitude*wofz(z).real / max(self.tiny, (sigma*self.s2pi))
 
     def skewed_voigt(self, x, amplitude=1.0, center=0.0, sigma=1.0, gamma=None, skew=0.0):
         """Return a Voigt lineshape, skewed with error function.
@@ -198,18 +352,18 @@ class N2_fit:
         Useful, for example, for ad-hoc Compton scatter profile. For more
         information, see: https://en.wikipedia.org/wiki/Skew_normal_distribution
         """
-        beta = skew/max(tiny, (s2*sigma))
+        beta = skew/max(self.tiny, (self.s2*sigma))
         asym = 1 + erf(beta*(x-center))
-        return asym * voigt(x, amplitude, center, sigma, gamma=gamma)
+        return asym * self.voigt(x, amplitude, center, sigma, gamma=gamma)
 
     def n2_model(self, x, a1,a2,a3,a4,a5,a6,a7, c1,c2,c3,c4,c5,c6,c7, sigma,gamma,skew):
-        tw = skewed_voigt(x,amplitude=a1,  center=c1,  sigma=sigma,  gamma=gamma,  skew=skew) +\
-             skewed_voigt(x,amplitude=a2,  center=c2,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-             skewed_voigt(x,amplitude=a3,  center=c3,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-             skewed_voigt(x,amplitude=a4,  center=c4,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-             skewed_voigt(x,amplitude=a5,  center=c5,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-             skewed_voigt(x,amplitude=a6,  center=c6,  sigma=sigma,  gamma=gamma,  skew=skew)+\
-             skewed_voigt(x,amplitude=a7,  center=c7,  sigma=sigma,  gamma=gamma,  skew=skew)
+        tw = self.skewed_voigt(x,amplitude=a1,  center=c1,  sigma=sigma,  gamma=gamma,  skew=skew) +\
+             self.skewed_voigt(x,amplitude=a2,  center=c2,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+             self.skewed_voigt(x,amplitude=a3,  center=c3,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+             self.skewed_voigt(x,amplitude=a4,  center=c4,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+             self.skewed_voigt(x,amplitude=a5,  center=c5,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+             self.skewed_voigt(x,amplitude=a6,  center=c6,  sigma=sigma,  gamma=gamma,  skew=skew)+\
+             self.skewed_voigt(x,amplitude=a7,  center=c7,  sigma=sigma,  gamma=gamma,  skew=skew)
 
              #skewed_voigt(x,amplitude=a8,  center=c8,  sigma=sigma,  gamma=gamma,  skew=skew)+\
              #skewed_voigt(x,amplitude=a9,  center=c9,  sigma=sigma,  gamma=gamma,  skew=skew)+\
@@ -219,6 +373,47 @@ class N2_fit:
     # internal fit routine
     def _fit_n2(self, x,y, print_fit_results=False, save_img=False,fit_data=True, 
                 vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.055, fix_param=False):
+        """
+        This function performs a fit on the array x and y of a nitrogen spectra. 
+        The initial guess of the fit can be modified via the arguments.
+
+        Parameters
+        ----------
+        x : numpy.array
+             the motor position array
+        y : numpy.array
+              the detector readings array
+        print_fit_results: boolean
+               if True the fit results report from lm fit is printed on the terminal
+        save_img: boolean or string
+               if False no image is saved
+               if is a string use the image will be saved with this name 
+               (include the extension: pdf,png,jpg...)
+        fit_data: boolean
+               If False the data and the initial guess will be shown
+               If True the fit will be performed
+        vc1: string or float:
+               If 'auto' the first max will be guessed automatically
+               if the automatic guess fails input the position of the first max
+        amp_sf: int or float
+               scaling factor for the amplitude. empirically a value of 6 works well
+        sigma: int or float
+               the sigma of the gaussian contribution to the voigt peak   
+        sigma_min: int or float
+               the lower bound for the sigma parameter for the fit
+        sigma_max: int or float
+               the upper bound for the sigma parameter for the fit
+        gamma: int or float
+               the gamma of the loretzian contribution to the voigt peak
+        fix_param: boolean
+               two rountines can be used
+               if True, the sigma and gamma and skew of all the seven peaks are the same
+               if False, the sigma and gamma and skew of all the seven peaks are indipendent
+
+        Return
+        --------
+        sigma_v2, center_v1,sigma_v2_err, vp_ratio: float
+        """
         # normalize intensity
         norm = np.max(y)
         y = y/norm
@@ -317,15 +512,15 @@ class N2_fit:
         elif fix_param == True:
             print('Using fixed parameters fit')
             guess = {'vc1': vc1,                  'amp1':np.max(y)/amp_sf,
-             'vc2': vc1+diff_centers[0],  'amp2':guess_amp(x,y,vc1+diff_centers[0])/amp_sf,
-             'vc3': vc1+diff_centers[1],  'amp3':guess_amp(x,y,vc1+diff_centers[1])/amp_sf,
-             'vc4': vc1+diff_centers[2],  'amp4':guess_amp(x,y,vc1+diff_centers[2])/amp_sf,
-             'vc5': vc1+diff_centers[3],  'amp5':guess_amp(x,y,vc1+diff_centers[3])/amp_sf,
-             'vc6': vc1+diff_centers[4],  'amp6':guess_amp(x,y,vc1+diff_centers[4])/amp_sf,
-             'vc7': vc1+diff_centers[5],  'amp7':guess_amp(x,y,vc1+diff_centers[5])/amp_sf,
-             'vc8': vc1+diff_centers[6],  'amp8':guess_amp(x,y,vc1+diff_centers[6])/amp_sf,
-             'vc9': vc1+diff_centers[7],  'amp9':guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
-             'vc10':vc1+diff_centers[8],  'amp10':guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
+             'vc2': vc1+diff_centers[0],  'amp2':self.guess_amp(x,y,vc1+diff_centers[0])/amp_sf,
+             'vc3': vc1+diff_centers[1],  'amp3':self.guess_amp(x,y,vc1+diff_centers[1])/amp_sf,
+             'vc4': vc1+diff_centers[2],  'amp4':self.guess_amp(x,y,vc1+diff_centers[2])/amp_sf,
+             'vc5': vc1+diff_centers[3],  'amp5':self.guess_amp(x,y,vc1+diff_centers[3])/amp_sf,
+             'vc6': vc1+diff_centers[4],  'amp6':self.guess_amp(x,y,vc1+diff_centers[4])/amp_sf,
+             'vc7': vc1+diff_centers[5],  'amp7':self.guess_amp(x,y,vc1+diff_centers[5])/amp_sf,
+             'vc8': vc1+diff_centers[6],  'amp8':self.guess_amp(x,y,vc1+diff_centers[6])/amp_sf,
+             'vc9': vc1+diff_centers[7],  'amp9':self.guess_amp(x,y,vc1+diff_centers[7])/amp_sf,
+             'vc10':vc1+diff_centers[8],  'amp10':self.guess_amp(x,y,vc1+diff_centers[8])/amp_sf,
             }
 
             pars = Parameters()
@@ -337,7 +532,7 @@ class N2_fit:
             pars['lin_intercept'].set(value=np.average(y[-10:]))
 
 
-            mod = Model(n2_model) + lin_mod
+            mod = Model(self.n2_model) + lin_mod
            # pars = mod.make_params(a1=guess['amp1'],a2=guess['amp2'],a3=guess['amp3'],a4=guess['amp4'],a5=guess['amp5'],
            #                 a6=guess['amp6'],a7=guess['amp7'],a8=guess['amp8'],a9=guess['amp9'],a10=guess['amp10'], 
            #                 c1=guess['vc1'],c2=guess['vc2'],c3=guess['vc3'],c4=guess['vc4'],c5=guess['vc5'],
@@ -423,7 +618,7 @@ class N2_fit:
             for i in range(1,8):
                 ind=str(i)
                 counter += 1
-                axes[1].plot(x,skewed_voigt(x, amplitude=comps['a'+ind], center=comps['c'+ind], sigma=comps['sigma'], gamma=comps['gamma'], skew=comps['skew']), '--', label='Voigt component ' + str(counter))
+                axes[1].plot(x,self.skewed_voigt(x, amplitude=comps['a'+ind], center=comps['c'+ind], sigma=comps['sigma'], gamma=comps['gamma'], skew=comps['skew']), '--', label='Voigt component ' + str(counter))
 
 
 
@@ -486,6 +681,56 @@ class N2_fit:
 
     def fit_n2(self, scan, motor='pgm', detector='Keithley01',print_fit_report=False, save_img=False, fit=True,
                vc1='auto', amp_sf=6,sigma = 0.02, sigma_min=0.001,sigma_max=0.02,gamma=0.0563, fix_param = False):
+        """
+        This function calls _n2fit to perform a fit on the array x and y of a nitrogen spectra. 
+        The initial guess of the fit can be modified via the arguments.
+
+        Parameters
+        ----------
+        scan : negative int or string
+            for the last scan -1
+            or use the db indentifier
+            'Jens': if available it loads the data from P04,
+            the old beamline of J.Viefhaus
+        motor : string
+            the motor and axis name connected by a _
+            for instance m1.tx would be m1_tx
+        detector : string
+            the detector to retrieve, if more than one detector was used
+            in the scan and we don't want to use the first one
+        print_fit_results: boolean
+            if True the fit results report from lm fit is printed on the terminal
+        save_img: boolean or string
+            if False no image is saved
+            if is a string use the image will be saved with this name 
+            (include the extension: pdf,png,jpg...)
+        fit_data: boolean
+            If False the data and the initial guess will be shown
+            If True the fit will be performed
+        vc1: string or float:
+            If 'auto' the first max will be guessed automatically
+            if the automatic guess fails input the position of the first max
+        amp_sf: int or float
+            scaling factor for the amplitude. empirically a value of 6 works well
+        sigma: int or float
+            the sigma of the gaussian contribution to the voigt peak   
+        sigma_min: int or float
+            the lower bound for the sigma parameter for the fit
+        sigma_max: int or float
+            the upper bound for the sigma parameter for the fit
+        gamma: int or float
+            the gamma of the loretzian contribution to the voigt peak
+        fix_param: boolean
+            two rountines can be used
+            if True, the sigma and gamma and skew of all the seven peaks are the same
+            if False, the sigma and gamma and skew of all the seven peaks are indipendent
+
+        Return
+        --------
+        RP, vp_ratio: float
+            the resolving power RP calculated by the gaussian contribution  
+            and the valley over peak ratio, both estimated by the fit
+        """
         energy, intensity                  = self.retrieve_spectra(scan)
         sigma, center, sigma_err,vp_ratio  = self._fit_n2(energy, intensity, print_fit_results=print_fit_report, save_img=save_img,fit_data=fit,
                                                     vc1=vc1,amp_sf=amp_sf,sigma=sigma,sigma_min=sigma_min,sigma_max=sigma_max,gamma=gamma,
