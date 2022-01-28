@@ -129,8 +129,6 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
 
     md_args = list(chain(*((repr(motor), start, stop)
                            for motor, start, stop in partition(3, args))))
-    names = ["motor","start","stop"]
-    md_args_dict = dict(zip(names,md_args))
     motor_names = tuple(motor.name for motor, start, stop
                         in partition(3, args))
     md = md or {}
@@ -138,7 +136,7 @@ def scan(detectors, *args, num=None, per_step=None, md=None):
     command_elog = create_command_string_for_scan(detectors, motor_names, args, num)
     
     _md = {'plan_args': {'detectors': list(map(repr, detectors)),
-                         'num': num, 'args': md_args_dict,
+                         'num': num, 'args': md_args,
                          'per_step': repr(per_step)},
            'plan_name': 'scan',
            'plan_pattern': 'inner_product',
