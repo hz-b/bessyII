@@ -247,7 +247,7 @@ def scan_intervals(detectors, *args, num=None, per_step=None, md=None):
     _md = {'plan_args': {'detectors': list(map(repr, detectors)),
                          'num': num, 'args': md_args,
                          'per_step': repr(per_step)},
-           'plan_name': 'scan_intervals',
+           'plan_name': 'scan',
            'plan_pattern': 'inner_product',
            'plan_pattern_module': plan_patterns.__name__,
            'plan_pattern_args': dict(num=num, args=md_args),
@@ -344,9 +344,9 @@ def scan_stepsize(detectors, *args, step=None, per_step=None, md=None):
     command_elog = create_command_string_for_scan(detectors, motor_names, args, step)
     
     _md = {'plan_args': {'detectors': list(map(repr, detectors)),
-                         'step': step, 'args': md_args,
+                         'num': step, 'args': md_args,
                          'per_step': repr(per_step)},
-           'plan_name': 'scan_stepsize',
+           'plan_name': 'scan',
            'plan_pattern': 'inner_product',
            'plan_pattern_module': plan_patterns.__name__,
            'plan_pattern_args': dict(step=step, args=md_args),
