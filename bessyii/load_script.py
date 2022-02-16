@@ -42,8 +42,8 @@ class simple_load():
     instantiate with 
       from .base import *
       from bessyii.load_script import simple_load
-      SL = simple_load(user_script_location='/home/simone/bluesky/user_scripts/',
-                 user_ns_location='/home/simone/.ipython/profile_root/startup/BEAMLINE/user_ns/')
+      SL = simple_load(user_script_location='/home/....../bluesky/user_scripts/',
+                 user_ns_location='/home/...../.ipython/profile_root/startup/BEAMLINE/user_ns/')
       load_user_script = SL.load_script
 
     then use with:
