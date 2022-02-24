@@ -98,12 +98,10 @@ def restore(baseline_stream, devices, md=None):
                     #We only want to restore if the attribute is a signal
                     if configuration_attr in signal_names:
                         
-                        print(configuration_attr)
+                        
                         
                         configuration_dict[configuration_attr] = configuration[device.name +'_'+configuration_attr.replace('.','_')].values[0]
                 
-                print(configuration)
-                print(configuration_dict)
 
                 #Perform the configuration for that device
                 device.configure(configuration_dict)
