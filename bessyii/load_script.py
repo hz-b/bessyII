@@ -26,7 +26,7 @@ def prepend_line(file_name, line):
 def compare(a, b):
     """
     Compare two strings character by character.
-    Returns False if at least one pair of charcaters differs
+    Returns False if at least one pair of charcaters differs.
     """
     result = True
     for x, y in zip(a, b):
