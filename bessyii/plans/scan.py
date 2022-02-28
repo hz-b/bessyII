@@ -383,3 +383,46 @@ def scan_stepsize(detectors, *args, step=None, per_step=None, md=None):
                                per_step=per_step, md=_md))
 
 
+def rel_scan_intervals(detectors, *args, num=None, per_step=None, md=None):
+    """
+    Scan over one multi-motor trajectory relative to current position.
+    num is the number of intervals and not of points!!!
+    Parameters
+    ----------
+    detectors : list
+        list of 'readable' objects
+    *args :
+        For one dimension, ``motor, start, stop``.
+        In general:
+        .. code-block:: python
+            motor1, start1, stop1,
+            motor2, start2, start2,
+            ...,
+            motorN, startN, stopN,
+        Motors can be any 'settable' object (motor, temp controller, etc.)
+    num : integer
+        number of points
+    per_step : callable, optional
+        hook for customizing action of inner loop (messages per step).
+        See docstring of :func:`bluesky.plan_stubs.one_nd_step` (the default)
+        for details.
+    md : dict, optional
+        metadata
+    See Also
+    --------
+    :func:`bluesky.plans.rel_grid_scan`
+    :func:`bluesky.plans.inner_product_scan`
+    :func:`bluesky.plans.scan_nd`
+    """
+    _md = {'plan_name': 'rel_scan'}
+    md = md or {}
+    _md.update(md)
+    motors = [motor for motor, start, stop in partition(3, args)]
+
+    @bpp.reset_positions_decorator(motors)
+    @bpp.relative_set_decorator(motors)
+    def inner_rel_scan():
+        return (yield from scan_intervals(detectors, *args, num=num,
+                                per_step=per_step, md=_md))
+
+    return (yield from inner_rel_scan())
