@@ -107,8 +107,8 @@ class BestEffortCallback(QtAwareCallback):
         self.clear()
         self._start_doc = doc
         self.plan_hints = doc.get('hints', {})
-        print('self._start_doc',self._start_doc['detectors'])
-        print('self.standard_detectors',self.standard_detectors)
+        #print('self._start_doc',self._start_doc['detectors'])
+        #print('self.standard_detectors',self.standard_detectors)
         # Prepare a guess about the dimensions (independent variables) in case
         # we need it.
         motors = self._start_doc.get('motors')
@@ -164,6 +164,7 @@ class BestEffortCallback(QtAwareCallback):
             if self._table_enabled:
                 print("New stream: {!r}".format(stream_name))
         
+        # Simo
         # here we make a list of detectors that should not be plotted
         # the detectors to not be plot are the ones defined in 
         # self.standard_detectors
@@ -183,7 +184,7 @@ class BestEffortCallback(QtAwareCallback):
                 seen.add(x)
         # here we remove the duplicates detectors from the list of detectors to not be plot
         detectors_to_not_plot = [x for x in self.standard_detectors if x not in dupes]
-        print('detectors_to_not_plot', detectors_to_not_plot)
+        #print('detectors_to_not_plot', detectors_to_not_plot)
         columns = hinted_fields(doc, st_det=detectors_to_not_plot)
 
         # ## This deals with old documents. ## #
@@ -635,14 +636,15 @@ class LivePlotPlusPeaks(LivePlot):
 
 
 def hinted_fields(descriptor, st_det=None):
+    'Simo'
     # Figure out which columns to put in the table.
-    print("descriptor['object_keys']", descriptor['object_keys'])
+    #print("descriptor['object_keys']", descriptor['object_keys'])
     obj_names = list(descriptor['object_keys'])
-    print('obj_names',obj_names)
-    print('st_det',st_det)
+    #print('obj_names',obj_names)
+    #print('st_det',st_det)
     if st_det != None:
         obj_names = [x for x in obj_names if x not in st_det]
-    print('new obj_names',obj_names)
+    #print('new obj_names',obj_names)
             
     # We will see if these objects hint at whether
     # a subset of their data keys ('fields') are interesting. If they
