@@ -168,10 +168,10 @@ class BestEffortCallback(QtAwareCallback):
                 print("New stream: {!r}".format(stream_name))
         
         # this line is if we decide to not redefine plans as classes
-        #if self.standard_detectors != None and len(self._start_doc['detectors'])>len(self._start_doc['detectors']):
+        if self.standard_detectors != None and len(self._start_doc['detectors'])>len(self._start_doc['detectors']):
         
         # this line is if we decide to redefine plans as classes
-        if self.standard_detectors != None:
+        #if self.standard_detectors != None:
             # Simo
             # here we make a list of detectors that should not be plotted
             # the detectors to not be plot are the ones defined in 
