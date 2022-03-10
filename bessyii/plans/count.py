@@ -70,57 +70,65 @@ def create_command_string_for_count(detectors, num, delay):
         command = 'It was not possible to create this entry'
     return command
 
-def count(detectors, num=1, delay=None, *, per_shot=None, md=None):
-    """
-    Take one or more readings from detectors.
-    Parameters
-    ----------
-    detectors : list
-        list of 'readable' objects
-    num : integer, optional
-        number of readings to take; default is 1
-        If None, capture data until canceled
-    delay : iterable or scalar, optional
-        Time delay in seconds between successive readings; default is 0.
-    per_shot : callable, optional
-        hook for customizing action of inner loop (messages per step)
-        Expected signature ::
-           def f(detectors: Iterable[OphydObj]) -> Generator[Msg]:
-               ...
-    md : dict, optional
-        metadata
-    Notes
-    -----
-    If ``delay`` is an iterable, it must have at least ``num - 1`` entries or
-    the plan will raise a ``ValueError`` during iteration.
-    """
-    if num is None:
-        num_intervals = None
-    else:
-        num_intervals = num - 1
-    
-    command_elog = create_command_string_for_count(detectors, num, delay)
-    
-    _md = {'detectors': [det.name for det in detectors],
-           'num_points': num,
-           'num_intervals': num_intervals,
-           'plan_args': {'detectors': list(map(repr, detectors)), 'num': num},
-           'plan_name': 'count',
-           'command_elog' : command_elog,
-           'hints': {}
-           }
-    _md.update(md or {})
-    _md['hints'].setdefault('dimensions', [(('time',), 'primary')])
+class BessyCount:
+    def __init__(self, st_det=None):
+        self.st_det = st_det
+        
+    def count(self, detectors, num=1, delay=None, *, per_shot=None, md=None):
+        """
+        Take one or more readings from detectors.
+        Parameters
+        ----------
+        detectors : list
+            list of 'readable' objects
+        num : integer, optional
+            number of readings to take; default is 1
+            If None, capture data until canceled
+        delay : iterable or scalar, optional
+            Time delay in seconds between successive readings; default is 0.
+        per_shot : callable, optional
+            hook for customizing action of inner loop (messages per step)
+            Expected signature ::
+            def f(detectors: Iterable[OphydObj]) -> Generator[Msg]:
+                ...
+        md : dict, optional
+            metadata
+        Notes
+        -----
+        If ``delay`` is an iterable, it must have at least ``num - 1`` entries or
+        the plan will raise a ``ValueError`` during iteration.
+        """
+        if self.st_det != None:
+            for st_detector in self.st_det:
+                detectors.append(st_detector)
+        
+        if num is None:
+            num_intervals = None
+        else:
+            num_intervals = num - 1
+        
+        command_elog = create_command_string_for_count(detectors, num, delay)
+        
+        _md = {'detectors': [det.name for det in detectors],
+            'num_points': num,
+            'num_intervals': num_intervals,
+            'plan_args': {'detectors': list(map(repr, detectors)), 'num': num},
+            'plan_name': 'count',
+            'command_elog' : command_elog,
+            'hints': {}
+            }
+        _md.update(md or {})
+        _md['hints'].setdefault('dimensions', [(('time',), 'primary')])
 
-    if per_shot is None:
-        per_shot = bps.one_shot
+        if per_shot is None:
+            per_shot = bps.one_shot
 
-    @bpp.stage_decorator(detectors)
-    @bpp.run_decorator(md=_md)
-    def inner_count():
-        return (yield from bps.repeat(partial(per_shot, detectors),
-                                      num=num, delay=delay))
+        @bpp.stage_decorator(detectors)
+        @bpp.run_decorator(md=_md)
+        def inner_count():
+            return (yield from bps.repeat(partial(per_shot, detectors),
+                                        num=num, delay=delay))
 
-    return (yield from inner_count())
+        return (yield from inner_count())
 
 

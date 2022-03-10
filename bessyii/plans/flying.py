@@ -63,6 +63,7 @@ def create_command_string_for_flyscan(detectors, motor_name, start, stop, vel, d
 
 
 
+    
 def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=None):
     
     """
@@ -113,20 +114,20 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=N
     x_fields.extend(getattr(motor, 'hints', {}).get('fields', []))
     command_elog = create_command_string_for_flyscan(detectors, flyer.name, start, stop, vel, delay)
     _md = {'detectors': [det.name for det in detectors],
-           'motors': x_fields,
-           'plan_args': {'detectors': list(map(repr, detectors)),
-                         'motors' : flyer.name,
-                         'start': start, 
-                         'stop' : stop,
-                         'vel': vel,
-                         'delay': del_req,
-                         'args':md_args
-                         },
+        'motors': x_fields,
+        'plan_args': {'detectors': list(map(repr, detectors)),
+                        'motors' : flyer.name,
+                        'start': start, 
+                        'stop' : stop,
+                        'vel': vel,
+                        'delay': del_req,
+                        'args':md_args
+                        },
 
-           'plan_name': 'flycount',
-           'command_elog' : command_elog,
-           'hints': {},
-       }
+        'plan_name': 'flycount',
+        'command_elog' : command_elog,
+        'hints': {},
+    }
     _md.update(md or {})
     
     # Deterime the name of the x axis for plotting from the flyer
@@ -142,7 +143,7 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=N
     
     _md['hints'] = default_hints
     _md.update(md)
-  
+
     # Configure the flyer (but don't yet init or start)
     flyer.start_pos.put(start)
     flyer.end_pos.put(stop)
