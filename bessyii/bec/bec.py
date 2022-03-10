@@ -167,7 +167,7 @@ class BestEffortCallback(QtAwareCallback):
             if self._table_enabled:
                 print("New stream: {!r}".format(stream_name))
         
-        if self.standard_detectors != None: 
+        if self.standard_detectors != None and len(self._start_doc['detectors'])>len(self._start_doc['detectors']): 
             # Simo
             # here we make a list of detectors that should not be plotted
             # the detectors to not be plot are the ones defined in 
