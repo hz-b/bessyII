@@ -60,6 +60,9 @@ class BestEffortCallback(QtAwareCallback):
         # hack to handle the bottom border of the table
         self._buffer = StringIO()
         self._baseline_toggle = True
+        
+        # detectors to not plot
+        self.standard_detectors = None
 
     def enable_heading(self):
         "Print timestamp and IDs at the top of a run."
@@ -164,27 +167,32 @@ class BestEffortCallback(QtAwareCallback):
             if self._table_enabled:
                 print("New stream: {!r}".format(stream_name))
         
-        # Simo
-        # here we make a list of detectors that should not be plotted
-        # the detectors to not be plot are the ones defined in 
-        # self.standard_detectors
-        detectors_to_not_plot = self.standard_detectors
+        if self.standard_detectors != None: 
+            # Simo
+            # here we make a list of detectors that should not be plotted
+            # the detectors to not be plot are the ones defined in 
+            # self.standard_detectors
+            detectors_to_not_plot = self.standard_detectors
+            
+            # here we check if in the detector list passed to the scan
+            # there are duplicates. If there are duplicates it's beacuse
+            # they appear once in the user defined detectors, and once in the
+            # standard detectors, so we remove them from the list of detectors to not be plot
+            
+            seen = set()
+            dupes = [] # here we store the duplicates detectors
         
-        # here we check if in the detector list passed to the scan
-        # there are duplicates. If there are duplicates it's beacuse
-        # they appear once in the user defined detectors, and once in the
-        # standard detectors, so we remove them from the list of detectors to not be plot
-        seen = set()
-        dupes = [] # here we store the duplicates detectors
-       
-        for x in self._start_doc['detectors']:
-            if x in seen:
-                dupes.append(x)
-            else:
-                seen.add(x)
-        # here we remove the duplicates detectors from the list of detectors to not be plot
-        detectors_to_not_plot = [x for x in self.standard_detectors if x not in dupes]
-        #print('detectors_to_not_plot', detectors_to_not_plot)
+            for x in self._start_doc['detectors']:
+                if x in seen:
+                    dupes.append(x)
+                else:
+                    seen.add(x)
+            # here we remove the duplicates detectors from the list of detectors to not be plot
+            detectors_to_not_plot = [x for x in self.standard_detectors if x not in dupes]
+            #print('detectors_to_not_plot', detectors_to_not_plot)
+        else:
+            detectors_to_not_plot = None
+        
         columns = hinted_fields(doc, st_det=detectors_to_not_plot)
 
         # ## This deals with old documents. ## #
