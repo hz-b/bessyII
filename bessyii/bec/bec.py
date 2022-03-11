@@ -168,7 +168,7 @@ class BestEffortCallback(QtAwareCallback):
                 print("New stream: {!r}".format(stream_name))
         
         # this line is if we decide to not redefine plans as classes
-        if self.standard_detectors != None and len(self._start_doc['detectors'])>len(self._start_doc['detectors']):
+        if self.standard_detectors != None and len(self._start_doc['detectors'])>len(self.standard_detectors):
         
         # this line is if we decide to redefine plans as classes
         #if self.standard_detectors != None:
