@@ -1,7 +1,18 @@
 '''
-    Best Effort Callback.
-    For instructions on how to test in a simulated environment please see:
-        tests/interactive/best_effort_cb.py
+    Bessy augmentation of Best Effort Callback.
+    
+    in base.py:
+    #from bluesky.callbacks.best_effort import BestEffortCallback
+    from bessyii.bec.bec_bessy import BestEffortCallbackBessy
+    bec = BestEffortCallbackBessy()
+
+    in tools.py:
+    #imports from bessyii
+    from .base import *
+    # bec standard detectors
+    from .beamline import *
+    bec.define_standard_detectors(['noisy_det','det1', 'det2'])
+    st_det = [noisy_det,det1, det2]
 '''
 from cycler import cycler
 from datetime import datetime
@@ -17,27 +28,29 @@ import time
 from warnings import warn
 import weakref
 
-#from bluesky.callbacks.core import LiveTable, make_class_safe
-#from bluesky.callbacks.mpl_plotting import LivePlot, LiveGrid, LiveScatter, QtAwareCallback
-#import logging
-
 from bluesky.callbacks.core import LiveTable, make_class_safe
 from bluesky.callbacks.fitting import PeakStats
 from bluesky.callbacks.mpl_plotting import LivePlot, LiveGrid, LiveScatter, QtAwareCallback
 from bluesky.callbacks.best_effort import BestEffortCallback,LivePlotPlusPeaks
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-    
+@make_class_safe(logger=logger)
 class BestEffortCallbackBessy(BestEffortCallback):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.standard_detectors = None
     
     def define_standard_detectors(self, standard_detectors):
-        "Simo"
+        "Define standard detectors as a list of strings"
         self.standard_detectors=standard_detectors
     
     def descriptor(self, doc):
+        ''' This method is modified to avoid plotting a detector in the
+            standard detector list unless is defined by the user
+        '''
         self._descriptors[doc['uid']] = doc
         stream_name = doc.get('name', 'primary')  # fall back for old docs
 
