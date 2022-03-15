@@ -1,7 +1,8 @@
 import pytest
 import bessyii_devices
 from bessyii.eLog import writeToELog,ELogCallback
-from ophyd.sim import motor, noisy_det
+from ophyd.sim import motor, noisy_det, det2
+from bluesky.plans import count
 from bluesky.preprocessors import SupplementalData
 from jinja2 import Template
 from bluesky import RunEngine
@@ -66,6 +67,7 @@ j2_end_template = Template(end_template)
 beamline_status_template ="""
 <b>Beamline Status</b>
 <br>noisy_det:            {{noisy_det}}
+<br>noisy_det_sigma:            {{noisy_det_sigma}}
 """
 j2_baseline_template = Template(beamline_status_template)
 
@@ -96,7 +98,7 @@ def test_write():
 def test_callback():
     
     RE.md['eLog_id_num'] = '7645'
-    RE([Msg('open_run', plan_args={}), Msg('close_run')])
+    RE(count([det2],10),reason='pytest')
     
     #we can't assert anything, but we can at least check it runs. 
     # You should check that somthing is written to the elog!

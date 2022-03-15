@@ -241,6 +241,7 @@ class ELogCallback(CallbackBase):
     """
     def __init__(self,db,start_template,baseline_template,stop_template):
         self._descriptors = {}
+        self._initial_baseline_config = {}
         self._baseline_toggle = True
         self._eLog_id_num = None
         self._db = db
@@ -256,6 +257,8 @@ class ELogCallback(CallbackBase):
             
     def descriptor(self, doc):
         self._descriptors[doc['uid']] = doc
+        for key in doc['configuration']:
+            self._initial_baseline_config = { **self._initial_baseline_config, **doc['configuration'][key]['data']}
         
     def event(self, doc):
         
@@ -268,7 +271,7 @@ class ELogCallback(CallbackBase):
                 
                 if self._eLog_id_num != None:
                     
-                    writeToELog(self._baseline_template.render(doc['data']),self._eLog_id_num)
+                    writeToELog(self._baseline_template.render({ **doc['data'], **self._initial_baseline_config}),self._eLog_id_num)
                
             
         # Do something
@@ -286,6 +289,7 @@ class ELogCallback(CallbackBase):
         self._baseline_toggle = True
         self._eLog_id_num = None
         self._descriptors.clear()
+        self._initial_baseline_config.clear()
 
 ###### log in and out functions:
 
