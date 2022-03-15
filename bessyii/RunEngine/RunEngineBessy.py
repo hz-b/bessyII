@@ -10,7 +10,7 @@ class RunEngineBessy(RunEngine):
         kind_map = {} # dictionary with original hinted/normal states. 
         # NOTE: we use detector instance is the key - to avoid problem with hacked component names (e.g. keithley sets readback name to the device name)
         for det in self._silent_det:
-            if not det in args[0].gi_frame.f_locals['detectors']:
+            if not det in args[0].gi_frame.f_locals['detectors'] and det not in args[0].gi_frame.f_locals['args']:
                 # handle Device(s) explicitly - for all components marked as hinted set then to normal
                 if isinstance(det, Device):
                     hinted_components = [cc for cc in det.component_names if getattr(det, cc).kind == Kind.hinted]
