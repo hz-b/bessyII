@@ -63,20 +63,23 @@ class simple_load():
         plans : string, optional
             name of the plans file, if different
     """
-    def __init__(self, user_script_location, user_ns_location, base='base', beamline='beamline', plans='plans'):
-        self.user_script_location     = user_script_location
-        self.user_ns_location = user_ns_location
-        self.base = base
-        self.beamline = beamline
-        self.plans = plans
+    def __init__(self, user_script_location, user_ns_location, beamline='beamline', plans='plans', custom_lines = None):
+        self.user_script_location = user_script_location
+        self.user_ns_location     = user_ns_location
+        self.beamline    = beamline
+        self.plans       = plans
         self.lines = ["# start of automatically prepended lines",
                       'import sys', 
                       "sys.path.append('"+self.user_ns_location+"')", 
-                      "from "+self.base+" import *",
                       "from "+self.beamline+" import *",
-                      "from "+self.plans+" import *",         
-                      "# end of automatically prepended lines"
+                      "from "+self.plans+" import *",
+                      "from IPython import get_ipython",
+                      "user_ns = get_ipython().user_ns"
                       ]
+        if custom_lines != None:
+            for cl in custom_lines:
+                self.lines.append(cl)
+        self.lines.append("# end of automatically prepended lines")
         self.lines.reverse()
     def load_script(self,filepath_within_usl):
         # assemble the path to the file
