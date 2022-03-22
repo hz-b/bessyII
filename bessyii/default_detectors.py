@@ -15,8 +15,9 @@ from bluesky.utils import Msg
 def change_kind(plan, devices):
     if 'detectors' in plan.gi_frame.f_locals:
         silent_det = [dev for dev in devices if not dev in plan.gi_frame.f_locals['detectors']]
-        silent_sig = [sig[1] for dev in silent_det for sig in dev.get_instantiated_signals() 
-                  if sig[1].attr_name in dev.read_attrs]
+        silent_sig = []
+        [silent_sig.append(sig[1]) for dev in silent_det for sig in dev.get_instantiated_signals() 
+                  if sig[1].attr_name in dev.read_attrs and not sig[1] in silent_sig]
         signal_kinds = {sig: sig.kind for sig in silent_sig}
         start_msgs = [Msg('init_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
         close_msgs = [Msg('close_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
@@ -68,7 +69,7 @@ class SupplementalDataSilentDets(SupplementalData):
 
 from ophyd import Kind
 async def init_silent(msg):
-    msg.kwargs['kind'] = msg.obj.kind   
+    msg.kwargs['kind'] = msg.obj.kind
     msg.obj.kind = Kind.normal
 
 async def close_silent(msg):    
