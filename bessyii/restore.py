@@ -11,7 +11,7 @@ from ophyd import PVPositioner, PositionerBase
 import bluesky.preprocessors as bpp
 from bluesky.protocols import Status
 
-def restore(baseline_stream, devices, md=None):
+def restore(baseline_stream, devices, use_readback=True, md=None):
     """
     
     Restore the a set of devices to setpoint values defined in a baseline.
@@ -24,7 +24,9 @@ def restore(baseline_stream, devices, md=None):
     baseline_stream : baseline stream 
         the baseline stream we want to restore from e.g db[-1].baseline
     devices : a list of devices
-        the devices we are going to restore        
+        the devices we are going to restore   
+    use_readback : boolean
+        if true (default) then restore readbacks, otherwise restore setpoints
     md : dict, optional
         metadata
 
@@ -115,17 +117,20 @@ def restore(baseline_stream, devices, md=None):
             if isinstance(device,PositionerBase):
                 
                 for attr in device.read_attrs:
-                    if "setpoint" in str(attr):                         
-                        signal_name = device.name + '_'+ attr
-                        print(f"found {signal_name} in baseline")
+                    if use_readback:
+    
+                        signal_name = device.readback.name
+         
+                    else:
+                                                
+                        signal_name = device.setpoint.name
+                    
+                    dev_obj = device
+                    val = baseline_data[signal_name].values[0]
+                    print(f"found {signal_name} in baseline, restoring to {val}")
+                    ret = yield Msg('set', dev_obj, val, group = 'restore')
+                    status_objects.append(ret)
 
-                        dev_obj = device
-                        setpoint_val = baseline_data[signal_name].values[0]
-                        ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
-                        status_objects.append(ret)
-
-        
-        
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
 
