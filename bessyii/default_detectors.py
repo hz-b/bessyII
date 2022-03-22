@@ -18,8 +18,8 @@ def change_kind(plan, devices):
         silent_sig = [sig[1] for dev in silent_det for sig in dev.get_instantiated_signals() 
                   if sig[1].attr_name in dev.read_attrs]
         signal_kinds = {sig: sig.kind for sig in silent_sig}
-        start_msgs = [Msg('init_silent', sig, kind=silent_sig[sig]) for sig in silent_sig]
-        close_msgs = [Msg('close_silent', sig, kind=silent_sig[sig]) for sig in silent_sig]
+        start_msgs = [Msg('init_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
+        close_msgs = [Msg('close_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
         plan.gi_frame.f_locals['detectors'] += silent_det
 
         def insert_after_open(msg):
