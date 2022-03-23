@@ -118,20 +118,20 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
             #check that the device is a positioner
             if isinstance(device,PositionerBase):
                 
-                for attr in device.read_attrs:
-                    if use_readback:
-    
-                        signal_name = device.readback.name
-         
-                    else:
-                                                
-                        signal_name = device.setpoint.name
-                    
-                    dev_obj = device
-                    val = baseline_data[signal_name].values[0]
-                    print(f"found {signal_name} in baseline, restoring to {val}")
-                    ret = yield Msg('set', dev_obj, val, group = 'restore')
-                    status_objects.append(ret)
+                
+                if use_readback:
+
+                    signal_name = device.readback.name
+        
+                else:
+                                            
+                    signal_name = device.setpoint.name
+                
+                dev_obj = device
+                val = baseline_data[signal_name].values[0]
+                print(f"found {signal_name} in baseline, restoring to {val}")
+                ret = yield Msg('set', dev_obj, val, group = 'restore')
+                status_objects.append(ret)
 
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
