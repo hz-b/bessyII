@@ -27,7 +27,7 @@ def change_kind(plan, devices):
                     if sig[1].attr_name in dev.read_attrs and not sig[1] in silent_sig:
                         silent_sig.append(sig[1])                
             else:
-                print(f'{type(dev)} is not supported yet.')
+                print(f"{type(dev)} is not supported yet.")
 
         signal_kinds = {sig: sig.kind for sig in silent_sig}
         start_msgs = [Msg('init_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
