@@ -275,7 +275,9 @@ def beam_reduction_xas_flyer_line(detectors,flyer,energies,motor,start_pos,step_
         if step < num-1:
             yield from sleep(sleep_time)
             yield from checkpoint()
-               
+
+from bluesky.preprocessors import plan_mutator as plan_mangler
+
 def valve_open_wrapper(plan, valve):
 
     """
@@ -293,19 +295,34 @@ def valve_open_wrapper(plan, valve):
     msg : Msg
         messages from plan with set messages inserted
     """
-    
+    seen_group_list = []
     def insert_open_close(msg):
+        
 
         if (msg.command == 'wait' and "set" in msg.kwargs['group']):
             return None, abs_set(valve, 1, wait=True)
             
-        elif (msg.command == 'save'):
+        elif (msg.command == 'set' and msg.kwargs['group'] not in seen_group_list and msg.obj != valve):
+            #Add it to the positioners to move
+            #Msg('set', obj=SynAxis(prefix='', name='motor', read_attrs=['readback', 'setpoint'], configuration_attrs=['velocity', 'acceleration']), args=(1.6666666666666665,), kwargs={'group': 'set-6e4e36'}, run=None),
+            grp = msg.kwargs['group']
+            seen_group_list.append(grp)
             
-            return None, abs_set(valve, 0, wait=True)
+            def abs_set_in_group(obj, val, group):
+                ret = yield Msg('set', obj, val, group=group)
+                return ret
+                
+            
+            return None, abs_set_in_group(valve, 0, group=grp)
+        
+        elif (msg.command == 'close_run'):
+             return None, abs_set(valve, 0, wait=True)
+            
+
         else:
             return None, None
             
-    return (yield from plan_mutator(plan, insert_open_close))
+    return (yield from plan_mangler(plan, insert_open_close))
 
     
 def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,step_size,num,valve,sleep_time,*,md=None):
@@ -371,7 +388,7 @@ def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,ste
             yield from abs_set(mono, energy[0], wait=True)
             
             #perform the scan
-            yield from scan(detectors,mono,energy[0],energy[1],num, per_step =one_nd_step_rad,md=_md)
+            yield from valve_open_wrapper(scan(detectors,mono,energy[0],energy[1],num, per_step =one_nd_step_rad,md=_md),valve)
             
             #close the valve:
             yield from abs_set(valve, 0, wait=True)
