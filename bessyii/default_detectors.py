@@ -1,7 +1,7 @@
 #bluesky imports
 from bluesky.callbacks.best_effort import BestEffortCallback
 from bluesky import RunEngine
-from ophyd import Kind
+from ophyd import Kind, Signal, Device
 
 #define the plan wrapper
 from bluesky.preprocessors import (
@@ -16,8 +16,17 @@ def change_kind(plan, devices):
     if 'detectors' in plan.gi_frame.f_locals:
         silent_det = [dev for dev in devices if not dev in plan.gi_frame.f_locals['detectors']]
         silent_sig = []
-        [silent_sig.append(sig[1]) for dev in silent_det for sig in dev.get_instantiated_signals() 
-                  if sig[1].attr_name in dev.read_attrs and not sig[1] in silent_sig]
+
+        for dev in silent_det:
+            if isinstance(dev, Signal):
+                silent_sig.append(dev)
+            elif isinstance(dev, Device):
+                for sig in dev.get_instantiated_signals():
+                    if sig[1].attr_name in dev.read_attrs and not sig[1] in silent_sig:
+                        silent_sig.append(sig[1])                
+            else:
+                print(f"{type(dev)} is not supported yet.")
+
         signal_kinds = {sig: sig.kind for sig in silent_sig}
         start_msgs = [Msg('init_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
         close_msgs = [Msg('close_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
