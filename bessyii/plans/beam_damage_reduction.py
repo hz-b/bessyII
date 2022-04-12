@@ -32,7 +32,7 @@ except ImportError:
 
 from bluesky import plan_patterns
 
-from bluesky.plans import scan_nd
+from bluesky.plans import scan_nd, scan
 from bluesky import utils
 from bluesky.utils import Msg
 
@@ -325,7 +325,7 @@ def valve_open_wrapper(plan, valve):
     return (yield from plan_mangler(plan, insert_open_close))
 
     
-def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,step_size,num,valve,sleep_time,*,md=None):
+def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,step_size,num,sleep_time,*,valve=None,md=None):
 
     """
     move a motor from a start position in a line at num points, with step_size increment
@@ -349,7 +349,7 @@ def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,ste
         how much should we move the motor at each step. The sign will dictate direction
     num: int
         how many steps should we have in one line? must be a multiple of number of energy ranges
-    valve: PVPositioner
+    valve: PVPositioner (optional)
         A positioner that we can move to open and close the beam
     sleep_time: int
         the time in seconds to wait between moving each 
@@ -366,8 +366,9 @@ def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,ste
     
 
     #close the valve:
-    yield from abs_set(valve, 0, wait=True)
-    yield from checkpoint()
+    if valve:
+        yield from abs_set(valve, 0, wait=True)
+        yield from checkpoint()
     
     #move the sample stage to the start position
     yield from abs_set(motor, start_pos, wait=True)
@@ -388,11 +389,16 @@ def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,ste
             yield from abs_set(mono, energy[0], wait=True)
             
             #perform the scan
-            yield from valve_open_wrapper(scan(detectors,mono,energy[0],energy[1],num, per_step =one_nd_step_rad,md=_md),valve)
-            
+            if valve:
+                yield from valve_open_wrapper(scan(detectors,mono,energy[0],energy[1],num,md=_md),valve)
+            else:
+                yield from scan(detectors,mono,energy[0],energy[1],num,md=_md)
+
             #close the valve:
-            yield from abs_set(valve, 0, wait=True)
-            yield from checkpoint()
+            
+            if valve:
+                yield from abs_set(valve, 0, wait=True)
+                yield from checkpoint()
     
             #move the motors of the sample stage
             yield from rel_set(motor,step_size, wait=True)
