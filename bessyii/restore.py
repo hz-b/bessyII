@@ -124,15 +124,19 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                     # create a position dictionary
                     position_dict = {}
                     
-                    for pseudo_axis in device.pseudo_positioners:
+                    #calculate the values that the real positioners were set to
+                    for real_axis in device.real_positioners:
                         
-                        signal_name = pseudo_axis.setpoint.name
+                        signal_name = real_axis.setpoint.name
                         signal_value = baseline_data[signal_name].values[0]
-                        position_dict[pseudo_axis._attr_name] = signal_value
+                        position_dict[real_axis._attr_name] = signal_value
+                    
+                    #From that real position derive the pseudo position we need to drive to
+                    pseudo_pos = device.inverse(position_dict)
                     
                     #Use that position dictionary as the setpoint
                     dev_obj = device
-                    setpoint_val = position_dict
+                    setpoint_val = pseudo_pos
                     ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
                     status_objects.append(ret)
                         
