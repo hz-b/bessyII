@@ -93,7 +93,9 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                 signal_names = []
                 for signal in device.get_instantiated_signals():
 
-                    signal_names.append(signal[0].replace(name,''))
+                    if signal[1].write_access:
+                        signal_names.append(signal[0].replace(name,''))
+
                     
                 for configuration_attr in device.configuration_attrs:
                     
