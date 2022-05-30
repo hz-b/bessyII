@@ -116,20 +116,36 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
             #check that the device is a positioner
             if isinstance(device,PositionerBase):
                 
-                for attr in device.read_attrs:
-                    if use_readback:
-    
-                        signal_name = device.readback.name
-         
-                    else:
-                                                
-                        signal_name = device.setpoint.name
+                # if it's a PseudoPositioner then write a position 
+                if isinstance(device,PseudoPositioner):
                     
+                    # create a position dictionary
+                    position_dict = {}
+                    
+                    for pseudo_axis in device.pseudo_positioners:
+                        
+                        signal_name = pseudo_axis.setpoint.name
+                        signal_value = baseline_data[signal_name].values[0]
+                        position_dict[pseudo_axis._attr_name] = signal_value
+                    
+                    #Use that position dictionary as the setpoint
                     dev_obj = device
-                    val = baseline_data[signal_name].values[0]
-                    print(f"found {signal_name} in baseline, restoring to {val}")
-                    ret = yield Msg('set', dev_obj, val, group = 'restore')
+                    setpoint_val = position_dict
+                    ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
                     status_objects.append(ret)
+                        
+                #if it's not a PseudoPositioner then write the setpoint in the baseline again 
+                else:
+                    for attr in device.read_attrs:
+                        if "setpoint" in str(attr):                         
+                            signal_name = device.name + '_'+ attr
+                            print(f"found {signal_name} in baseline")
+
+                            dev_obj = device
+                            setpoint_val = baseline_data[signal_name].values[0]
+                            ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
+                            status_objects.append(ret)
+
 
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
