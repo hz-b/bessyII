@@ -6,7 +6,7 @@ from bluesky.utils import (
     ensure_generator,
     short_uid as _short_uid,
 )
-from ophyd import PVPositioner, PositionerBase
+from ophyd import PVPositioner, PositionerBase, PseudoPositioner
 
 import bluesky.preprocessors as bpp
 from bluesky.protocols import Status
