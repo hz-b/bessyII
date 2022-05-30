@@ -63,7 +63,7 @@ def create_command_string_for_flyscan(detectors, motor_name, start, stop, vel, d
 
 
 
-def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=None):
+def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=None):
     
     """
     count detectors while flying a flyer with start, stop, initial scan velocity, and the delay between det sample time
@@ -81,9 +81,9 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=N
     stop : float
         The stop value of the flyer
     vel : float
-        The initial velocity of the flyer; default is 0.2
+        The initial velocity of the flyer; default is 0.1
     delay : iterable or scalar, optional
-        Time delay in seconds between successive readings; default is 0.2
+        Time delay in seconds between successive readings; default is 0.1
     md : dict, optional
         metadata
 
@@ -102,9 +102,9 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,*, md=N
 
     del_req = delay
 
-    if del_req < 0.2:
+    if del_req < 0.1:
         
-        raise ValueError("Sample rate too high.Delay must be >= 0.2 \n")
+        raise ValueError("Sample rate too high.Delay must be >= 0.1 \n")
 
     flyer.velocity.put(vel)
 

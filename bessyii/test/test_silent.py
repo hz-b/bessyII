@@ -191,8 +191,16 @@ def test_baseline_single_det_double_silent_motor_hinted_check():
     assert set(sd_test.dev_list) == set(['det3','motor1_setpoint','motor1'])
     
     #confirm that the detector is put back to hinted
-    assert motor1.setpoint.kind == Kind.hinted
+    assert motor1.setpoint.kind == Kind.normal
     assert motor1.readback.kind == Kind.hinted
+
+def test_baseline_single_det_multiple_same_silent():
+
+    D = SupplementalDataSilentDets(baseline=[det1], silent_devices=[det1, det2, det2])
+
+    RE(D(count([det3])), sd_test)
+
+    assert det2.val.kind == Kind.hinted
 
 
     

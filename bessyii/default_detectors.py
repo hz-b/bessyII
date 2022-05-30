@@ -1,7 +1,7 @@
 #bluesky imports
 from bluesky.callbacks.best_effort import BestEffortCallback
 from bluesky import RunEngine
-from ophyd import Kind
+from ophyd import Kind, Signal, Device
 
 #define the plan wrapper
 from bluesky.preprocessors import (
@@ -12,12 +12,25 @@ from bluesky.preprocessors import (
 from bluesky.utils import Msg
 
 #this is basically the monitor_during_wrapper so ensure the message order works
-def change_kind(plan, signals):
+def change_kind(plan, devices):
     if 'detectors' in plan.gi_frame.f_locals:
-        silent_sig = [sig for sig in signals if sig not in plan.gi_frame.f_locals['detectors']]
-        start_msgs = [Msg('init_silent', sig) for sig in silent_sig]
-        close_msgs = [Msg('close_silent', sig) for sig in silent_sig]
-        plan.gi_frame.f_locals['detectors'] += silent_sig
+        silent_det = [dev for dev in devices if not dev in plan.gi_frame.f_locals['detectors']]
+        silent_sig = []
+
+        for dev in silent_det:
+            if isinstance(dev, Signal):
+                silent_sig.append(dev)
+            elif isinstance(dev, Device):
+                for sig in dev.get_instantiated_signals():
+                    if sig[1].attr_name in dev.read_attrs and not sig[1] in silent_sig:
+                        silent_sig.append(sig[1])                
+            else:
+                print(f"{type(dev)} is not supported yet.")
+
+        signal_kinds = {sig: sig.kind for sig in silent_sig}
+        start_msgs = [Msg('init_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
+        close_msgs = [Msg('close_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
+        plan.gi_frame.f_locals['detectors'] += silent_det
 
         def insert_after_open(msg):
             if msg.command == 'open_run':
@@ -65,21 +78,8 @@ class SupplementalDataSilentDets(SupplementalData):
 
 from ophyd import Kind
 async def init_silent(msg):
-    
-    for signal in msg.obj.get_instantiated_signals():
-        sig = signal[1] #since it's a tuple
-        
-        #check if it's a read attr, and that it's hinted. I include this line to deal with detectors which don't have val as their read_attr name
-        if sig.attr_name in msg.obj.read_attrs and sig.kind == Kind.hinted:
-    
-            sig.kind = Kind.normal
-    
-async def close_silent(msg):
-    
-    
-    for signal in msg.obj.get_instantiated_signals():
-        sig = signal[1] #since it's a tuple
-        
-        if sig.attr_name in msg.obj.read_attrs and sig.kind == Kind.normal:
-    
-            sig.kind = Kind.hinted
+    msg.kwargs['kind'] = msg.obj.kind
+    msg.obj.kind = Kind.normal
+
+async def close_silent(msg):    
+    msg.obj.kind = msg.kwargs['kind']
