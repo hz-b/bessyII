@@ -14,12 +14,21 @@ db = temp()
 RE.subscribe(db.v1.insert)
 
 ##set up some test devices
-
 from ophyd.sim import SynAxis
 from bessyii_devices.positioners import PVPositionerDone
-
+import time as ttime
+import numpy as np
 class SimPositionerDone(SynAxis, PVPositionerDone):
-        
+
+    """
+    A PVPositioner which reports done immediately AND conforms to the standard of other positioners with signals for 
+    
+    setpoint
+    readback
+    done
+    
+    
+    """
     def _setup_move(self, position):
         '''Move and do not wait until motion is complete (asynchronous)'''
         self.log.debug('%s.setpoint = %s', self.name, position)
@@ -28,6 +37,19 @@ class SimPositionerDone(SynAxis, PVPositionerDone):
             self.log.debug('%s.actuate = %s', self.name, self.actuate_value)
             self.actuate.put(self.actuate_value)
         self._toggle_done()
+        
+    def __init__(self,
+                 name,
+                 readback_func=None,
+                 value=0,
+                 delay=0,
+                 precision=3,
+                 parent=None,
+                 labels=None,
+                 kind=None,**kwargs):
+        super().__init__(name=name, parent=parent, labels=labels, kind=kind,readback_func=readback_func,delay=delay,precision=precision,
+                         **kwargs)
+        self.set(value)
     
     
     
@@ -71,11 +93,12 @@ class Pseudo3x3(PseudoPositioner):
     """
     pseudo1 = Component(PseudoSingle, limits=(-10, 10), egu='a')
     pseudo2 = Component(PseudoSingle, limits=(-10, 10), egu='b')
-    pseudo3 = Component(PseudoSingle, limits=None, egu='c')
+    pseudo3 = Component(PseudoSingle, limits=(-10, 10), egu='c')
     
-    real1 = Component(SoftPositioner, init_pos=0.)
-    real2 = Component(SoftPositioner, init_pos=0.)
-    real3 = Component(SoftPositioner, init_pos=0.)
+    #add some offset to distinguish readback and setpoint
+    real1 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
+    real2 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
+    real3 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
 
     @pseudo_position_argument
     def forward(self, pseudo_pos):
@@ -359,7 +382,7 @@ def test_device_not_in_baseline_values():
 def test_pseudo_positioner():
     
     #move the pseudo_positioner to some initial position
-    p3.move(1,2,3)
+    p3.move(4,5,6)
     
     #Perform a measurement to generate some new baseline readings
     RE(scan([noisy_det],p3.pseudo1,4,5,10))
@@ -373,9 +396,12 @@ def test_pseudo_positioner():
     #Now check that we can restore the original positions
     RE(restore(baseline_stream,[p3]))
     
-    assert p3.pseudo1.readback.get() == 1
-    assert p3.pseudo2.readback.get() == 2
-    assert p3.pseudo3.readback.get() == 3
+    assert p3.pseudo1.setpoint.get() == 4
+    assert p3.pseudo2.setpoint.get() == 5
+    assert p3.pseudo3.setpoint.get() == 6
+    assert p3.pseudo1.readback.get() == 8
+    assert p3.pseudo2.readback.get() == 10
+    assert p3.pseudo3.readback.get() == 12
 
 
     
