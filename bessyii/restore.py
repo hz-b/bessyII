@@ -6,12 +6,12 @@ from bluesky.utils import (
     ensure_generator,
     short_uid as _short_uid,
 )
-from ophyd import PVPositioner, PositionerBase
+from ophyd import PVPositioner, PositionerBase, PseudoPositioner
 
 import bluesky.preprocessors as bpp
 from bluesky.protocols import Status
 
-def restore(baseline_stream, devices, md=None):
+def restore(baseline_stream, devices, use_readback=True, md=None):
     """
     
     Restore the a set of devices to setpoint values defined in a baseline.
@@ -24,7 +24,9 @@ def restore(baseline_stream, devices, md=None):
     baseline_stream : baseline stream 
         the baseline stream we want to restore from e.g db[-1].baseline
     devices : a list of devices
-        the devices we are going to restore        
+        the devices we are going to restore   
+    use_readback : boolean
+        if true (default) then restore readbacks, otherwise restore setpoints
     md : dict, optional
         metadata
 
@@ -91,7 +93,10 @@ def restore(baseline_stream, devices, md=None):
                 signal_names = []
                 for signal in device.get_instantiated_signals():
 
-                    signal_names.append(signal[0].replace(name,''))
+                    if hasattr(signal[1] ,'write_access'):
+                        if signal[1].write_access:
+                            signal_names.append(signal[0].replace(name,''))
+
                     
                 for configuration_attr in device.configuration_attrs:
                     
@@ -114,18 +119,41 @@ def restore(baseline_stream, devices, md=None):
             #check that the device is a positioner
             if isinstance(device,PositionerBase):
                 
-                for attr in device.read_attrs:
-                    if "setpoint" in str(attr):                         
-                        signal_name = device.name + '_'+ attr
-                        print(f"found {signal_name} in baseline")
+                # if it's a PseudoPositioner then write a position 
+                if isinstance(device,PseudoPositioner):
+                    
+                    # create a position dictionary
+                    position_dict = {}
+                    
+                    #calculate the values that the real positioners were set to
+                    for real_axis in device.real_positioners:
+                        
+                        signal_name = real_axis.setpoint.name
+                        signal_value = baseline_data[signal_name].values[0]
+                        position_dict[real_axis._attr_name] = signal_value
+                    
+                    #From that real position derive the pseudo position we need to drive to
+                    pseudo_pos = device.inverse(position_dict)
+                    
+                    #Use that position dictionary as the setpoint
+                    dev_obj = device
+                    setpoint_val = pseudo_pos
+                    ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
+                    status_objects.append(ret)
+                        
+                #if it's not a PseudoPositioner then write the setpoint in the baseline again 
+                else:
+                    for attr in device.read_attrs:
+                        if "setpoint" in str(attr):                         
+                            signal_name = device.name + '_'+ attr
+                            print(f"found {signal_name} in baseline")
 
-                        dev_obj = device
-                        setpoint_val = baseline_data[signal_name].values[0]
-                        ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
-                        status_objects.append(ret)
+                            dev_obj = device
+                            setpoint_val = baseline_data[signal_name].values[0]
+                            ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
+                            status_objects.append(ret)
 
-        
-        
+
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
 

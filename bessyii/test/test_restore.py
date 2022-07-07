@@ -14,12 +14,21 @@ db = temp()
 RE.subscribe(db.v1.insert)
 
 ##set up some test devices
-
 from ophyd.sim import SynAxis
 from bessyii_devices.positioners import PVPositionerDone
-
+import time as ttime
+import numpy as np
 class SimPositionerDone(SynAxis, PVPositionerDone):
-        
+
+    """
+    A PVPositioner which reports done immediately AND conforms to the standard of other positioners with signals for 
+    
+    setpoint
+    readback
+    done
+    
+    
+    """
     def _setup_move(self, position):
         '''Move and do not wait until motion is complete (asynchronous)'''
         self.log.debug('%s.setpoint = %s', self.name, position)
@@ -28,12 +37,29 @@ class SimPositionerDone(SynAxis, PVPositionerDone):
             self.log.debug('%s.actuate = %s', self.name, self.actuate_value)
             self.actuate.put(self.actuate_value)
         self._toggle_done()
+        
+    def __init__(self,
+                 name,
+                 readback_func=None,
+                 value=0,
+                 delay=0,
+                 precision=3,
+                 parent=None,
+                 labels=None,
+                 kind=None,**kwargs):
+        super().__init__(name=name, parent=parent, labels=labels, kind=kind,readback_func=readback_func,delay=delay,precision=precision,
+                         **kwargs)
+        self.set(value)
+    
+    
     
 
 m1 = SimPositionerDone(name='m1' )
 m2 = SimPositionerDone(name='m2')
 m3 = SimPositionerDone(name='m3')
 from ophyd import EpicsMotor, Signal, Device, Component as Cpt
+
+
 class Stage(Device):
     
     x = Cpt(SimPositionerDone)
@@ -45,13 +71,61 @@ class StageOfStage(Device):
     a = Cpt(Stage)
     b= Cpt(Stage)
     config_param = Cpt(Signal, kind='config')
-    
+
 stage = StageOfStage(name = 'stage')
+
+
+
+#Create a PseudoPositioner
+
+from ophyd.pseudopos import (
+    PseudoPositioner,
+    PseudoSingle,
+    pseudo_position_argument,
+    real_position_argument
+)
+from ophyd import Component, SoftPositioner
+
+
+class Pseudo3x3(PseudoPositioner):
+    """
+    Interface to three positioners in a coordinate system that flips the sign.
+    """
+    pseudo1 = Component(PseudoSingle, limits=(-10, 10), egu='a')
+    pseudo2 = Component(PseudoSingle, limits=(-10, 10), egu='b')
+    pseudo3 = Component(PseudoSingle, limits=(-10, 10), egu='c')
+    
+    #add some offset to distinguish readback and setpoint
+    real1 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
+    real2 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
+    real3 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
+
+    @pseudo_position_argument
+    def forward(self, pseudo_pos):
+        "Given a position in the psuedo coordinate system, transform to the real coordinate system."
+        return self.RealPosition(
+            real1=-pseudo_pos.pseudo1,
+            real2=-pseudo_pos.pseudo2,
+            real3=-pseudo_pos.pseudo3
+        )
+
+    @real_position_argument
+    def inverse(self, real_pos):
+        "Given a position in the real coordinate system, transform to the pseudo coordinate system."
+        return self.PseudoPosition(
+            pseudo1=-real_pos.real1,
+            pseudo2=-real_pos.real2,
+            pseudo3=-real_pos.real3
+        )
+
+p3 = Pseudo3x3(name='p3')
+
+
 
 # Create a baseline
 sd = SupplementalData()
 
-sd.baseline = [m1, m2, stage] 
+sd.baseline = [m1, m2, stage,p3] 
 RE.preprocessors.append(sd)
 
 # Move the motors to some positions
@@ -304,5 +378,30 @@ def test_device_not_in_baseline_values():
     #attempt the restore
     with pytest.raises(KeyError) as e_info:
         RE(restore(baseline_stream, device_list))
+        
+def test_pseudo_positioner():
     
+    #move the pseudo_positioner to some initial position
+    p3.move(4,5,6)
+    
+    #Perform a measurement to generate some new baseline readings
+    RE(scan([noisy_det],p3.pseudo1,4,5,10))
+    
+    #Now move it again to a new position
+    p3.move(6,7,8)
 
+    baseline_stream = db[-1].baseline
+    
+    print(baseline_stream.read())
+    #Now check that we can restore the original positions
+    RE(restore(baseline_stream,[p3]))
+    
+    assert p3.pseudo1.setpoint.get() == 4
+    assert p3.pseudo2.setpoint.get() == 5
+    assert p3.pseudo3.setpoint.get() == 6
+    assert p3.pseudo1.readback.get() == 8
+    assert p3.pseudo2.readback.get() == 10
+    assert p3.pseudo3.readback.get() == 12
+
+
+    
