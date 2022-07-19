@@ -123,7 +123,7 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=N
                          'args':md_args
                          },
 
-           'plan_name': 'flycount',
+           'plan_name': 'flyscan',
            'command_elog' : command_elog,
            'hints': {},
        }
