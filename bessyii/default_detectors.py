@@ -8,6 +8,8 @@ from bluesky.preprocessors import (
     plan_mutator,
     single_gen,
     ensure_generator,
+    inject_md_wrapper
+    
 )
 from bluesky.utils import Msg
 
@@ -74,6 +76,26 @@ class SupplementalDataSilentDets(SupplementalData):
         plan = baseline_wrapper(plan, self.baseline)
         return(yield from plan)
 
+class BessySupplementalData(SupplementalDataSilentDets):
+    """
+    Extends the above class allowing us to add metadata from a PV automatically to all plans
+    """
+    def __init__(self, *args, light_status,beamline_name = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.light_status = light_status
+        self.beamline_name = beamline_name
+        
+    def __call__(self, plan):
+        status_string = self.light_status.get()
+        
+        if self.beamline_name:
+            status_string = str(self.beamline_name) +'_'+ status_string
+            
+        plan = inject_md_wrapper(plan, {"beamline_status" :status_string})
+        plan = change_kind(plan, self.silent_devices)
+        plan = baseline_wrapper(plan, self.baseline)
+        return(yield from plan)
+    
 #custom methods for the RunEngine to set the kind
 
 from ophyd import Kind
