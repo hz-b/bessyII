@@ -160,3 +160,91 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
         return tuple(status_objects)
 
     return(yield from inner_restore())
+
+
+# Create a function specifically for switching beamlines. Put it in a class so we can import it from a package
+
+from databroker.queries import TimeRange
+from ophyd import EpicsSignalRO
+
+from bluesky.utils import (
+    separate_devices,
+    all_safe_rewind,
+    Msg,
+    ensure_generator,
+    short_uid as _short_uid,
+)
+import bluesky.plan_stubs as bps
+
+class RestoreHelpers:
+    """
+    A class to help make the db variable global
+    
+    instantiate with 
+    
+      helpers = Helpers(db)
+
+
+    """
+    def __init__(self, db, shutter=None, beamline_name=None):
+        self._db = db
+        self._shutter = shutter
+        self._beamline_name = beamline_name
+        
+     
+       
+        
+    def switch_beamline(self,end_station,devices, shutter=None, uid=None,md=None):
+
+        """
+
+        Restore the environment of the 
+
+        Parameters
+        ----------
+        end_station: end_station we are going to move to
+            SISSY1, SISSY2, CAT, STXM, PINK
+        devices : a list of devices
+            the devices we are going to restore
+        shutter : A shutter
+            The valve or shutter to close before moving the light
+        uid: identifier, optional
+            The unique identifier to restore if we don't want the most recent
+        md : dict, optional
+            metadata
+
+        """
+        
+        #Search the database for the most recent run performed that has this beamline name
+        if uid == None:
+            
+            if self._beamline_name:
+           
+                search_results = self._db.search({'beamline':self._beamline_name, "end_station": str(end_station) })
+            
+            else:
+                
+                search_results = self._db.search({"end_station": str(end_station) })
+        
+            if len(search_results) >0:
+                run = search_results[-1]
+
+            else:
+                raise ValueError(f'There are no runs with at beamline {self._beamline_name}, end_station {end_station}')
+        
+        else:
+            run = db[uid]
+                      
+        baseline = run.baseline
+               
+        
+        #close the shutter
+        if shutter != None:
+            print(f"closing {shutter.name}")
+            yield from bps.mv(shutter,0)
+            
+        
+        
+        #Restore the beamline to the settings described in this run        
+        yield from restore(baseline, devices, md=md)
+    

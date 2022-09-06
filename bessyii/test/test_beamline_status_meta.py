@@ -59,6 +59,14 @@ def test_meta():
     run = db[-1]
     start_doc = run.metadata['start']
     assert start_doc['end_station'] == str(test_string)
+    
+def test_define_after_init():
+
+    sd.light_status = None
+    RE(count([det1]))
+    run = db[-1]
+    start_doc = run.metadata['start']
+    assert start_doc['end_station'] == " "
 
 
     

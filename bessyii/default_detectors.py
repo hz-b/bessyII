@@ -80,12 +80,14 @@ class BessySupplementalData(SupplementalDataSilentDets):
     """
     Extends the above class allowing us to add metadata from a PV automatically to all plans
     """
-    def __init__(self, *args, light_status, **kwargs):
+    def __init__(self, *args, light_status=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.light_status = light_status
         
     def __call__(self, plan):
-        status_string = self.light_status.get()
+        status_string = " "
+        if self.light_status:
+            status_string = self.light_status.get()
         
 
             

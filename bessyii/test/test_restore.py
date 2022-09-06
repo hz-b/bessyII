@@ -1,10 +1,21 @@
 import pytest
-from bessyii.restore import restore
+from bessyii.restore import restore, RestoreHelpers
 from ophyd.sim import motor, noisy_det
 from ophyd import SoftPositioner, Signal, Device, Component as Cpt
-from bluesky.preprocessors import SupplementalData
+from bessyii.default_detectors import BessySupplementalData, init_silent, close_silent
 from bluesky import RunEngine
 from databroker.v2 import temp
+
+
+#create the status pv's
+
+from ophyd import Signal
+
+light_status = Signal(name="light_status")
+
+test_string = "Test"
+light_status.put(test_string)
+
 
 ## Set up env
 
@@ -13,11 +24,24 @@ RE = RunEngine({})
 db = temp()
 RE.subscribe(db.v1.insert)
 
+beamline_name = "Test Beamline"
+RE.md["beamline"] = beamline_name
+
+
+
+# instantiate the helper with status and shutters
+
+restore_helpers = RestoreHelpers(db,beamline_name = beamline_name)
+
+def switch(end_station,devices, shutter=None, uid=None,md=None):
+        yield from restore_helpers.switch_beamline(end_station,devices, shutter=shutter, uid=uid,md=md)
+        
 ##set up some test devices
 from ophyd.sim import SynAxis
 from bessyii_devices.positioners import PVPositionerDone
 import time as ttime
 import numpy as np
+
 class SimPositionerDone(SynAxis, PVPositionerDone):
 
     """
@@ -57,6 +81,7 @@ class SimPositionerDone(SynAxis, PVPositionerDone):
 m1 = SimPositionerDone(name='m1' )
 m2 = SimPositionerDone(name='m2')
 m3 = SimPositionerDone(name='m3')
+sim_shutter = SimPositionerDone(name='sim_shutter')
 from ophyd import EpicsMotor, Signal, Device, Component as Cpt
 
 
@@ -123,9 +148,13 @@ p3 = Pseudo3x3(name='p3')
 
 
 # Create a baseline
-sd = SupplementalData()
+sd = BessySupplementalData()
 
-sd.baseline = [m1, m2, stage,p3] 
+sd.baseline = [m1, m2, stage,p3]
+
+# Add the beamline status PV
+sd.light_status = light_status
+
 RE.preprocessors.append(sd)
 
 # Move the motors to some positions
@@ -402,6 +431,76 @@ def test_pseudo_positioner():
     assert p3.pseudo1.readback.get() == 8
     assert p3.pseudo2.readback.get() == 10
     assert p3.pseudo3.readback.get() == 12
+
+def test_search_restore():
+    
+    current_end_station = light_status.get()
+    
+    #create the device list 
+    device_list = [m1,m2,stage.a.x, stage.b.y]
+    
+    #Record the initial values
+    initial_val = []
+    
+    for device in device_list :
+        
+        initial_val.append(device.readback.get())
+    
+    #Move the motors to some other positions
+    new_positions = [0,0,0,0]
+    RE(mv(m1,new_positions[0], m2, new_positions[1], stage.a.x, new_positions[2], stage.b.y, new_positions[3]))
+    
+    #change the readback of the endstation  
+    new_end_station = "new_es"
+    light_status.put(new_end_station)
+    
+    #create the device list 
+    device_list = [m1,m2,stage.a.x, stage.b.y]
+
+    #Perform a search trying to restore to the earlier positions
+    restore_plan = switch(current_end_station, device_list, shutter= sim_shutter)
+    
+    RE(restore_plan)
+    
+    restored_val = []
+    
+    for device in device_list :
+        
+        restored_val.append(device.readback.get())
+    
+    assert restored_val == initial_val
+    
+    ##Now check we can move back the other way
+    
+    #Perform a search trying to restore to the earlier positions
+    
+    
+        
+    restore_plan = switch(new_end_station, device_list, shutter= sim_shutter)
+    
+    RE(restore_plan)
+        
+    restored_val = []
+    
+    for device in device_list :
+        
+        restored_val.append(device.readback.get())
+    
+    assert restored_val == new_positions
+    
+def test_close_shutter():
+    
+    current_end_station = light_status.get()
+    device_list = []
+    plan_with_shutter = switch(current_end_station, device_list, shutter= sim_shutter)
+    
+    plan_without_shutter =switch(current_end_station, device_list)
+    
+    #Should be increased by 2 because we have to set and wait
+    assert len(list(plan_with_shutter)) == len(list(plan_without_shutter)) + 2
+    
+    
+    
 
 
     
