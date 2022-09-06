@@ -29,7 +29,7 @@ test_string = "Test"
 light_status.put(test_string)
 
 #initiate SupplementalData
-sd = BessySupplementalData(baseline=[det1], silent_devices=[det1, det2],light_status=light_status, beamline_name = 'HARD')
+sd = BessySupplementalData(baseline=[det1], silent_devices=[det1, det2],light_status=light_status)
 
 #add the functions to the RunEngine library so you can call them via Msg
 RE.register_command('init_silent', init_silent)
@@ -47,7 +47,7 @@ from bluesky.plan_stubs import mv
 
 def test_msg_len():
     
-    D = BessySupplementalData(light_status=light_status, beamline_name = 'HARD')
+    D = BessySupplementalData(light_status=light_status)
     original = list(count([det1]))
     processed = list(D(count([det1])))
     # should add 0 
@@ -58,7 +58,7 @@ def test_meta():
     RE(count([det1]))
     run = db[-1]
     start_doc = run.metadata['start']
-    assert start_doc['beamline_status'] == "HARD_"+str(test_string)
+    assert start_doc['end_station'] == str(test_string)
 
 
     
