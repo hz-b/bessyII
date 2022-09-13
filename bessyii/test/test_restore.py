@@ -29,13 +29,6 @@ RE.md["beamline"] = beamline_name
 
 
 
-# instantiate the helper with status and shutters
-
-restore_helpers = RestoreHelpers(db,beamline_name = beamline_name)
-
-def switch(end_station,devices, shutter=None, uid=None,md=None):
-        yield from restore_helpers.switch_beamline(end_station,devices, shutter=shutter, uid=uid,md=md)
-        
 ##set up some test devices
 from ophyd.sim import SynAxis
 from bessyii_devices.positioners import PVPositionerDone
@@ -82,7 +75,20 @@ m1 = SimPositionerDone(name='m1' )
 m2 = SimPositionerDone(name='m2')
 m3 = SimPositionerDone(name='m3')
 sim_shutter = SimPositionerDone(name='sim_shutter')
+
+
+
+# instantiate the helper with status and shutters
+
+restore_helpers = RestoreHelpers(db,beamline_name = beamline_name, shutter = sim_shutter )
+
+def switch(end_station,devices, uid=None,md=None):
+        yield from restore_helpers.switch_beamline(end_station,devices, uid=uid,md=md)
+        
+        
+        
 from ophyd import EpicsMotor, Signal, Device, Component as Cpt
+
 
 
 class Stage(Device):
@@ -458,7 +464,7 @@ def test_search_restore():
     device_list = [m1,m2,stage.a.x, stage.b.y]
 
     #Perform a search trying to restore to the earlier positions
-    restore_plan = switch(current_end_station, device_list, shutter= sim_shutter)
+    restore_plan = switch(current_end_station, device_list)
     
     RE(restore_plan)
     
@@ -476,7 +482,7 @@ def test_search_restore():
     
     
         
-    restore_plan = switch(new_end_station, device_list, shutter= sim_shutter)
+    restore_plan = switch(new_end_station, device_list)
     
     RE(restore_plan)
         
@@ -490,14 +496,30 @@ def test_search_restore():
     
 def test_close_shutter():
     
+    
     current_end_station = light_status.get()
-    device_list = []
-    plan_with_shutter = switch(current_end_station, device_list, shutter= sim_shutter)
     
-    plan_without_shutter =switch(current_end_station, device_list)
+    #create the device list 
+    device_list = [m1,m2,stage.a.x, stage.b.y]
     
-    #Should be increased by 2 because we have to set and wait
-    assert len(list(plan_with_shutter)) == len(list(plan_without_shutter)) + 2
+    #Move the motors to some other positions
+    new_positions = [0,0,0,0]
+    RE(mv(m1,new_positions[0], m2, new_positions[1], stage.a.x, new_positions[2], stage.b.y, new_positions[3]))
+    
+    #change the readback of the endstation  
+    new_end_station = "new_es"
+    light_status.put(new_end_station)
+    
+    #open the shutter
+    
+    sim_shutter.set(1)
+    
+    #Perform a search trying to restore to the earlier positions
+    restore_plan = switch(current_end_station, device_list)
+    
+    RE(restore_plan)
+    
+    assert sim_shutter.readback.get() == 0
     
     
     
