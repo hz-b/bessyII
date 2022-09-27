@@ -265,7 +265,7 @@ def beam_reduction_xas_flyer_line(detectors,flyer,energies,motor,start_pos,step_
             yield from abs_set(flyer, energy[0], wait=True)
 
             #perform the scan, opening and closing the valve
-            yield from rad_flyscan(detectors,flyer,energy[0],energy[1],mono_vel,valve=valve,open_value=open_value,close_value=close_value,md=_md)
+            yield from rad_flyscan(detectors,flyer,start=energy[0],stop=energy[1],vel=mono_vel,valve=valve,open_value=open_value,close_value=close_value,md=_md)
             
             #move the motors of the sample stage
             yield from rel_set(motor,step_size, wait=True)
