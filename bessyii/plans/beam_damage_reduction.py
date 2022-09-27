@@ -89,7 +89,7 @@ def create_command_string_for_flyscan(detectors, motor_name, start, stop, vel, d
 
 
 
-def rad_flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,valve=None,*, md=None):
+def rad_flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,valve=None,*,open_value=1,close_value=0, md=None):
     
     """
     count detectors while flying a flyer with start, stop, initial scan velocity, and the delay between det sample time
@@ -179,7 +179,7 @@ def rad_flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,val
     uid = yield from bps.open_run(_md)
     
     if valve:
-        yield from abs_set(valve, 1, wait=True)
+        yield from abs_set(valve, open_value, wait=True)
         yield from checkpoint()
 
     # Start the flyer and wait until it's reported that it's started
@@ -196,14 +196,14 @@ def rad_flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.2,val
         yield Msg('sleep', None, del_req)
 
     if valve:
-        yield from abs_set(valve, 0, wait=True)
+        yield from abs_set(valve, close_value, wait=True)
         yield from checkpoint()
     
     yield from bps.close_run()
     return uid
     
     
-def beam_reduction_xas_flyer_line(detectors,flyer,energies,motor,start_pos,step_size,num,valve,sleep_time,*,mono_vel=0.2,md=None):
+def beam_reduction_xas_flyer_line(detectors,flyer,energies,motor,start_pos,step_size,num,valve,sleep_time,*,open_value=1,close_value=0,mono_vel=0.2,md=None):
 
     """
     move a motor from a start position in a line at num points, with step_size increment
@@ -245,7 +245,7 @@ def beam_reduction_xas_flyer_line(detectors,flyer,energies,motor,start_pos,step_
     
 
     #close the valve:
-    yield from abs_set(valve, 0, wait=True)
+    yield from abs_set(valve, close_value, wait=True)
     yield from checkpoint()
     
     #move the sample stage to the start position
@@ -265,7 +265,7 @@ def beam_reduction_xas_flyer_line(detectors,flyer,energies,motor,start_pos,step_
             yield from abs_set(flyer, energy[0], wait=True)
 
             #perform the scan, opening and closing the valve
-            yield from rad_flyscan(detectors,flyer,energy[0],energy[1],mono_vel,valve=valve,md=_md)
+            yield from rad_flyscan(detectors,flyer,energy[0],energy[1],mono_vel,valve=valve,open_value=open_value,close_value=close_value,md=_md)
             
             #move the motors of the sample stage
             yield from rel_set(motor,step_size, wait=True)
@@ -278,7 +278,7 @@ def beam_reduction_xas_flyer_line(detectors,flyer,energies,motor,start_pos,step_
 
 from bluesky.preprocessors import plan_mutator as plan_mangler
 
-def valve_open_wrapper(plan, valve):
+def valve_open_wrapper(plan, valve,open_value=1,close_value=0):
 
     """
     Open a valve before any trigger and read, and close it afterwards
@@ -300,7 +300,7 @@ def valve_open_wrapper(plan, valve):
         
 
         if (msg.command == 'wait' and "set" in msg.kwargs['group']):
-            return None, abs_set(valve, 1, wait=True)
+            return None, abs_set(valve, open_value, wait=True)
             
         elif (msg.command == 'set' and msg.kwargs['group'] not in seen_group_list and msg.obj != valve):
             #Add it to the positioners to move
@@ -313,10 +313,10 @@ def valve_open_wrapper(plan, valve):
                 return ret
                 
             
-            return None, abs_set_in_group(valve, 0, group=grp)
+            return None, abs_set_in_group(valve, close_value, group=grp)
         
         elif (msg.command == 'close_run'):
-             return None, abs_set(valve, 0, wait=True)
+             return None, abs_set(valve, close_value, wait=True)
             
 
         else:
@@ -325,7 +325,7 @@ def valve_open_wrapper(plan, valve):
     return (yield from plan_mangler(plan, insert_open_close))
 
     
-def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,step_size,num,sleep_time,*,valve=None,md=None):
+def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,step_size,num,sleep_time,*,valve=None,open_value=1,close_value=0,md=None):
 
     """
     move a motor from a start position in a line at num points, with step_size increment
@@ -351,6 +351,11 @@ def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,ste
         how many steps should we have in one line? must be a multiple of number of energy ranges
     valve: PVPositioner (optional)
         A positioner that we can move to open and close the beam
+    open_value: double
+        the value that will be written to the valve positioner to open
+        
+    close_value: double
+        the value that will be written to the valve positioner to close
     sleep_time: int
         the time in seconds to wait between moving each 
     md : dict, optional
@@ -390,7 +395,7 @@ def beam_reduction_xas_stepwise_line(detectors,mono,energies,motor,start_pos,ste
             
             #perform the scan
             if valve:
-                yield from valve_open_wrapper(scan(detectors,mono,energy[0],energy[1],num,md=_md),valve)
+                yield from valve_open_wrapper(scan(detectors,mono,energy[0],energy[1],num,md=_md),valve,open_value=open_value,close_value=close_value)
             else:
                 yield from scan(detectors,mono,energy[0],energy[1],num,md=_md)
 
