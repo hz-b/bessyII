@@ -12,7 +12,12 @@ class RunEngineBessy(RunEngine):
         if 'detectors' in args[0].gi_frame.f_locals:
             # NOTE: we use detector instance is the key - to avoid problem with hacked component names (e.g. keithley sets readback name to the device name)
             for det in self._silent_det:
-                if not det in args[0].gi_frame.f_locals['detectors'] and det not in args[0].gi_frame.f_locals['args']:
+                if 'args' in args[0].gi_frame.f_locals:
+                    _condition_2 = det not in args[0].gi_frame.f_locals['args']
+                else:
+                    _condition_2 = True
+                
+                if not det in args[0].gi_frame.f_locals['detectors'] and _condition_2:
                     # handle Device(s) explicitly - for all components marked as hinted set then to normal
                     if isinstance(det, Device):
                         hinted_components = [cc for cc in det.component_names if getattr(det, cc).kind == Kind.hinted]
@@ -24,7 +29,9 @@ class RunEngineBessy(RunEngine):
                         kind_map[det] = det.kind
                         det.kind = Kind.normal
                 
-            args[0].gi_frame.f_locals['detectors'] += self._silent_det
+            #store the original list so it can be reused in the next scan even in IPython
+            _new_det_list = args[0].gi_frame.f_locals['detectors'].copy() + self._silent_det
+            args[0].gi_frame.f_locals['detectors'] = _new_det_list
         try: # wrap it in try-finally - we want to restore original state even if there was an error in executing run engine
             super().__call__(*args, **metadata_kw)
         finally:
@@ -37,4 +44,5 @@ class RunEngineBessy(RunEngine):
                 elif hasattr(det,"kind"): 
                     det.kind = kind_map[det]
                 else:
-                    raise AssertionError("Unknown kind of detector in the saved list - this should never happen!")  
+                    raise AssertionError("Unknown kind of detector in the saved list - this should never happen!") 
+            #restore the list to make this reusable in Ipython
