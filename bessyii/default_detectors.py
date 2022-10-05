@@ -57,7 +57,6 @@ def change_kind(plan, devices):
         return (yield from plan2)
     
     else:
-        
         return (yield from plan)
 
 #make sure the SupplementalData uses the wrapper
