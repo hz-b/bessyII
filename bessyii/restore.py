@@ -138,6 +138,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                     #Use that position dictionary as the setpoint
                     dev_obj = device
                     setpoint_val = pseudo_pos
+                    print(f"found {signal_name} in baseline, restoring to {position_dict}")
                     ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
                     status_objects.append(ret)
                         
@@ -146,10 +147,11 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                     for attr in device.read_attrs:
                         if "setpoint" in str(attr):                         
                             signal_name = device.name + '_'+ attr
-                            print(f"found {signal_name} in baseline")
+                          
 
                             dev_obj = device
                             setpoint_val = baseline_data[signal_name].values[0]
+                            print(f"found {signal_name} in baseline, restoring to {setpoint_val}")
                             ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
                             status_objects.append(ret)
 
@@ -160,3 +162,132 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
         return tuple(status_objects)
 
     return(yield from inner_restore())
+
+
+# Create a function specifically for switching beamlines. Put it in a class so we can import it from a package
+
+from databroker.queries import TimeRange
+from ophyd import EpicsSignalRO
+
+from bluesky.utils import (
+    separate_devices,
+    all_safe_rewind,
+    Msg,
+    ensure_generator,
+    short_uid as _short_uid,
+)
+import bluesky.plan_stubs as bps
+
+class RestoreHelpers:
+    """
+    A class to help make the db variable global
+    
+    instantiate with 
+    
+      helpers = Helpers(db)
+
+
+    """
+    def __init__(self, db, shutter=None, beamline_name=None):
+        self._db = db
+        self._shutter = shutter
+        self._beamline_name = beamline_name
+        
+     
+       
+        
+    def switch_beamline(self,end_station,devices,gold=None,user=None,name=None, uid=None,md=None):
+
+        """
+
+        Restore the environment of the 
+
+        Parameters
+        ----------
+        end_station: end_station we are going to move to
+            SISSY1, SISSY2, CAT, STXM, PINK
+        devices : a list of devices
+            the devices we are going to restore
+        gold: bool
+            if asserted search the database for the last gold set at this end station
+        user: string
+            three letter HZB username added to metadata (like qqu)
+        name: string
+            The name of the snapshot if it was specified when taken. If there are more than one with the same name, the most recent one is used
+        uid: identifier, optional
+            The unique identifier to restore if we don't want the most recent
+        md : dict, optional
+            metadata
+
+        """
+        
+        #Search the database for the most recent run performed that has this beamline name
+        if uid == None and name == None:
+            
+            results = self._db
+
+            
+            if self._beamline_name:
+           
+                search_results = results.search({'beamline':self._beamline_name, "end_station": str(end_station) })
+            
+            else:
+                
+                search_results = results.search({"end_station": str(end_station) })
+                
+            if user != None:
+                
+                search_results = search_results.search({'username':user})
+                
+                if len(search_results) == 0:
+                    raise ValueError(f'There are no runs with at beamline {self._beamline_name}, end_station {end_station}, taken by user {user}')
+                
+            if gold != None:
+                
+                search_results = search_results.search({'plan_name':'gold_snapshot'})
+                
+                if len(search_results) == 0:
+                    raise ValueError(f'There are no gold runs with at beamline {self._beamline_name}, end_station {end_station}')
+            
+            
+        
+            if len(search_results) >0:
+                run = search_results[-1]
+
+            else:
+                raise ValueError(f'There are no runs with at beamline {self._beamline_name}, end_station {end_station}')
+        
+        else:
+            if name:
+                
+                search_results = self._db.search({'snapshot_name':name})
+                
+                if len(search_results) >0:
+                    run = search_results[-1]
+                
+                if run.metadata['start']['end_station'] != end_station:
+
+                    raise ValueError(f'The snapshot >{name}< was not taken at end_station {end_station}')
+            
+            else:
+                
+                run = self._db[uid]
+            
+                if run.metadata['start']['end_station'] != end_station:
+
+                    raise ValueError(f'The uid {uid} was not taken at end_station {end_station}')
+                
+                      
+        baseline = run.baseline
+               
+        
+        #close the shutter
+        if self._shutter != None:
+            print(f"closing {self._shutter.name}")
+            yield from bps.mv(self._shutter,0)
+            
+        
+        
+        #Restore the beamline to the settings described in this run        
+        yield from restore(baseline, devices, md=md)
+    
