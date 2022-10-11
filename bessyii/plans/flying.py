@@ -13,6 +13,60 @@ from bluesky.utils import (
 
 from ophyd import Signal
 
+def flycount(detectors,flyer, *,delay=0.2, md=None):
+    """
+    read from detectors in a list while a flyer is running. Stop only when it completes
+
+    Parameters
+    ----------
+    detectors : list
+        list of 'readable' objects
+    flyer : flyer object
+    delay : iterable or scalar, optional
+        Time delay in seconds between successive readings; default is 0.2
+    md : dict, optional
+        metadata
+
+    Notes
+    -----
+
+    """
+
+    #Define the motor metadata (important for plotting)
+    md = md or {}
+
+    _md = {'detectors': [det.name for det in detectors],
+
+           'plan_args': {'detectors': list(map(repr, detectors))},
+           'flyer': flyer.name,
+           'plan_name': 'flycount',
+           'hints': {}
+           }
+
+    _md.update(md or {})
+    
+    
+    _md['hints'].setdefault('dimensions', [(('time',), 'primary')])
+    _md.update(md)
+
+    
+    # Init the run
+    uid = yield from bps.open_run(_md)
+
+    # Start the flyer and wait until it's reported that it's started
+    yield from bps.kickoff(flyer, wait=True)
+
+    # Get the status object that tells us when it's done
+    complete_status = yield from bps.complete(flyer, wait=False)
+    while not complete_status.done:
+
+        yield Msg('checkpoint') # allows us to pause the run 
+        yield from bps.one_shot(detectors) #triggers and reads everything in the detectors list
+        yield Msg('sleep', None, delay)
+
+    yield from bps.close_run()
+    return uid
+
 
 def create_command_string_for_flyscan(detectors, motor_name, start, stop, vel, delay):
     """
@@ -93,7 +147,7 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=N
     # Add test that detectors is a list longer than 0
     
     #Add the flyer to the list of things we want to count
-    detectors_list = detectors.append(flyer)
+    detectors_list = detectors + [flyer]
     
     
     #Define the motor metadata (important for plotting)
@@ -144,22 +198,6 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=N
     _md.update(md)
   
     # Configure the flyer (but don't yet init or start)
-    flyer.start_pos.put(start)
-    flyer.end_pos.put(stop)
-    
-    # Init the run
-    uid = yield from bps.open_run(_md)
-
-    # Start the flyer and wait until it's reported that it's started
-    yield from bps.kickoff(flyer, wait=True)
-
-    # Get the status object that tells us when it's done
-    complete_status = yield from bps.complete(flyer, wait=False)
-    while not complete_status.done:
-
-        yield Msg('checkpoint') # allows us to pause the run 
-        yield from bps.one_shot(detectors) #triggers and reads everything in the detectors list
-        yield Msg('sleep', None, del_req)
-
-    yield from bps.close_run()
-    return uid
+    yield from bps.abs_set(flyer.start_pos,start)
+    yield from bps.abs_set(flyer.end_pos,stop)
+    return(yield from flycount(detectors_list,flyer,delay=del_req,md=_md))
