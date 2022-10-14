@@ -18,6 +18,7 @@ def change_kind(plan, devices):
     if 'detectors' in plan.gi_frame.f_locals:
         silent_det = [dev for dev in devices if not dev in plan.gi_frame.f_locals['detectors']]
         silent_sig = []
+        
 
         for dev in silent_det:
             if isinstance(dev, Signal):
@@ -32,8 +33,11 @@ def change_kind(plan, devices):
         signal_kinds = {sig: sig.kind for sig in silent_sig}
         start_msgs = [Msg('init_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
         close_msgs = [Msg('close_silent', sig, kind=signal_kinds[sig]) for sig in silent_sig]
-        plan.gi_frame.f_locals['detectors'] += silent_det
-
+        #plan.gi_frame.f_locals['detectors'] += silent_det
+        
+        #This doesn't work because gi_frame.f_locals is read only
+        _new_det_list = plan.gi_frame.f_locals['detectors'].copy() + silent_det
+        plan.gi_frame.f_locals['detectors'] = _new_det_list
         def insert_after_open(msg):
             if msg.command == 'open_run':
                 def new_gen():
