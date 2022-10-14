@@ -37,8 +37,10 @@ def plan_mutator(plan, msg_proc):
 
         a generator that yields messages (`Msg` objects)
     msg_proc : callable
-        This function takes in a message and specifies messages(s) to replace
-        it with. The function must account for what type of response the
+        This function takes in a message (or additionally the previous message) 
+        and specifies messages(s) to replace it with.
+        
+        The function must account for what type of response the
         message would prompt. For example, an 'open_run' message causes the
         RunEngine to send a uid string back to the plan, while a 'set' message
         causes the RunEngine to send a status object back to the plan. The
@@ -61,6 +63,7 @@ def plan_mutator(plan, msg_proc):
         provide a way to specify which message's response should be sent out to
         the host plan. Again, it's the last message yielded by the first
         generator (``head``).
+        
 
     Yields
     ------
@@ -194,20 +197,16 @@ def plan_mutator(plan, msg_proc):
         if id(msg) not in msgs_seen:
             
             msgs_seen[id(msg)] = msg
+            
             # Use the id as a hash, and hold a reference to the msg so that
             # it cannot be garbage collected until the plan is complete.
-            #print(msg.command)
+            
+            # Additionally keep track of all previous messages
             msgs_seen_list.append(msg)
             args_list = inspect.getfullargspec(msg_proc)
             args_num = len(args_list[0])
-            """
-            pprint(f"msg_proc has {args_num} args")
-            #print(f"function has {len(sig.params)} arguments")
-            print(f"messages seen")
-            pprint(msgs_seen)
-            print("\n")
-            """
-            
+   
+            #if msg_proc has two arguements, give it the previous message as the second
             if args_num == 1:
                 new_gen, tail_gen = msg_proc(msg)
             elif args_num == 2:
@@ -276,9 +275,7 @@ def change_kind(plan, devices):
         
     
         def insert_trigger_before_wait_after_trigger(msg, last_msg):
-            #print(f"Trigger - Current message is {msg.command} last is {last_msg.command}")
             if msg.command == 'wait' and last_msg.command == "trigger":
-                #print("inserting extra triggers")
                 #find the group
                 group = last_msg.kwargs['group']
                 trigger_msgs = [Msg('trigger', sig, group=group) for sig in silent_sig]
@@ -290,9 +287,7 @@ def change_kind(plan, devices):
                 return None, None
                 
         def insert_read_before_read_after_create(msg, last_msg):
-            #print(f"Read - Current message is {msg.command} last is {last_msg.command}")
             if msg.command == 'read' and last_msg.command == "create":
-                #print("inserting extra reads")
 
                 read_msgs = [Msg('read', sig) for sig in silent_sig]
                 def new_gen():
@@ -323,10 +318,11 @@ def change_kind(plan, devices):
 
         # Apply nested mutations.
         plan1 = plan_mutator(plan, insert_after_open)
-        
         plan2 = plan_mutator(plan1, insert_read_before_read_after_create)
         plan3 = plan_mutator(plan2, insert_trigger_before_wait_after_trigger)
         plan4 = plan_mutator(plan3, insert_before_close)
+        
+        #finally, stage the silent_det list
         plan5 = stage_wrapper(plan4,silent_det)
         return (yield from plan5)
     
