@@ -93,7 +93,14 @@ def test_baseline_single_det_single_silent_det():
     processed = list(D(count([det3])))
     # should add 2x (trigger, wait, create, read, save) + (stage, init_silent,  trigger, read, ,close_silent, unstage)
     assert len(processed) == 16 + len(original)
-    
+
+def test_baseline_single_det_single_silent_det_multiple_dets_list():
+    # one baseline detector
+    D = SupplementalDataSilentDets(baseline=[det1], silent_devices=[det2])
+    original = list(count([det3,det4]))
+    processed = list(D(count([det3,det4])))
+    # should add 2x (trigger, wait, create, read, save) + (stage, init_silent,  trigger, read, ,close_silent, unstage)
+    assert len(processed) == 16 + len(original)
     
 def test_baseline_single_det_single_silent_det_in_dets():
     # one baseline detector, one silent device, but it's included in list of detectors
