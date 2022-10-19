@@ -64,6 +64,7 @@ def flycount(detectors,flyer, *,delay=0.2, md=None):
         yield from bps.one_shot(detectors) #triggers and reads everything in the detectors list
         yield Msg('sleep', None, delay)
 
+    yield from bps.collect(flyer)
     yield from bps.close_run()
     return uid
 
