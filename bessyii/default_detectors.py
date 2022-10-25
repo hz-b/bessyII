@@ -321,9 +321,15 @@ def change_kind(plan, devices):
         plan2 = plan_mutator(plan1, insert_read_before_read_after_create)
         plan3 = plan_mutator(plan2, insert_trigger_before_wait_after_trigger)
         plan4 = plan_mutator(plan3, insert_before_close)
-        
+
+        #Find all devices without parents in the detectors list
+
+        silent_device_parents = separate_devices(root_ancestor(device) for device in devices)
+        detector_device_parents = separate_devices(root_ancestor(device) for device in plan.gi_frame.f_locals['detectors'])
+
+        different_parents = [device for device in silent_device_parents if not device in detector_device_parents]
         #finally, stage the silent_det list
-        plan5 = stage_wrapper(plan4,silent_det)
+        plan5 = stage_wrapper(plan4,different_parents)
         return (yield from plan5)
     
     else:
