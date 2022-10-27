@@ -11,29 +11,20 @@ import time
 
 
 def requestInvestigationName(username,password):
-    """
-    use a username and password to request all the investigations available to the user, then ask the user to select one
+    """Use a username and password to request all the investigations available to the user, then ask the user to select one
 
-    Parameters
-    ----------
-    username : string
-        the username like qqu
-    password : string
-        the password
+
+    Args:
+        username (str): the username like :code:`qqu`
+        password (str): the password
+
+    Returns:
+        title (str): the title of the investigation
+        name (str): the investigation id
+        id_num (str): the eLog id number
+        full_name (str): the username of the user
         
-    Returns
-    ------------
-     title, name, id_num, full_name : string, string, string, string
-     
-         title is the title of the investigation
-         
-         name is the investigation id
-         
-         id_num is the eLog id number
-         
-         full_name is the username of the user
-         
-    """
+    """    
     session_id, full_name = getSessionID(username,password)
     
     if session_id == None:
@@ -104,26 +95,18 @@ def requestInvestigationName(username,password):
 
 
 def getSessionID(username, password):
-    
-    """
-    use a username and password to get a session id and the full name of the user
+    """Use a username and password to get a session id and the full name of the user
 
-    Parameters
-    ----------
-    username : string
-        the username like qqu
+    Args:
+        username (string): the username like qqu
     password : string
-        the password
-        
-    Returns
-    ------------
-     session_id, full_name : string, string
-     
-         session_id is the session id string used to authenticate an eLog session
-         
-         full_name is the username of the user
-         
-    """
+        password (string): the password
+
+    Returns:
+        session_id (str): the session id string used to authenticate an eLog session
+        full_name (str): the username of the user
+    """    
+
     proxies = {"http": "http://www.bessy.de:3128", "https": "http://www.bessy.de:3128"}
     header = {'Content-Type': 'application/json'}
     data = {"plugin":"hzbrex","username":username,"password":password}
@@ -162,25 +145,17 @@ def getSessionID(username, password):
 
 
 def writeToELog(message, investigation_id, session_id = '9987e109-fc74-4e1d-8d5a-d5e518686534'  ):
-    
-    """
-    use a username and password to write a message to a particular eLog investigation
+    """use a username and password to write a message to a particular eLog investigation
 
-    Parameters
-    ----------
-    message: string
-        the message to be written    
-    investigation_id:
-        the elog investigation id as returned by requestInvestigationName (id_num)
-    session_id:
-        used to authenticate. defaults to '9987e109-fc74-4e1d-8d5a-d5e518686534' 
-        
-    Returns
-    ------------
-     response.status_code : int
-         the http response code, 200 is good
-         
-    """
+    Args:
+        message (string): the message to be written    
+        investigation_id (string): the elog investigation id as returned by requestInvestigationName (id_num)
+        session_id (str, optional): used to authenticate. Defaults to '9987e109-fc74-4e1d-8d5a-d5e518686534'.
+
+    Returns:
+        response.status_code(int): the http response code, 200 is good
+    """    
+
     # make a new comment with the machine tag
     now = datetime.now()-timedelta(hours=2)
 
@@ -233,13 +208,27 @@ def writeToELog(message, investigation_id, session_id = '9987e109-fc74-4e1d-8d5a
 class ELogCallback(CallbackBase):
 
     """
-    A callback which writes to the eLog. To be called by RE. Assumes that it's only handling one document stream at a time
-    
-    If the start document doesn't contain a key 'eLog_id_num' nothing is written and the callback does nothing
-    
+    A callback which writes to the eLog. To be called by RE. 
+
+    Assumes that it's only handling one document stream at a time
+    If the start document doesn't contain a key 'eLog_id_num' nothing is 
+    written and the callback does nothing
+
+    Args:
+        db (_type_): databroker catalog
+        start_template (_type_): template to be written when start document is produced
+        baseline_template (_type_): template to be written when baseline is recorded
+        stop_template (_type_): template to be written when stop document is produced 
 
     """
     def __init__(self,db,start_template,baseline_template,stop_template):
+        """
+        Args:
+            db (_type_): databroker catalog
+            start_template (_type_): template to be written when start document is produced
+            baseline_template (_type_): template to be written when baseline is recorded
+            stop_template (_type_): template to be written when stop document is produced
+        """        
         self._descriptors = {}
         self._initial_baseline_config = {}
         self._baseline_toggle = True
@@ -250,17 +239,31 @@ class ELogCallback(CallbackBase):
         self._stop_template = stop_template
 
     def start(self, doc):
-        
+        """To be Documented
+
+        Args:
+            doc (_type_): _description_
+        """        
         if 'eLog_id_num' in doc:
             self._eLog_id_num = doc['eLog_id_num']
             writeToELog(self._start_template.render(doc),self._eLog_id_num)
             
     def descriptor(self, doc):
+        """To be Documented
+
+        Args:
+            doc (_type_): _description_
+        """        
         self._descriptors[doc['uid']] = doc
         for key in doc['configuration']:
             self._initial_baseline_config = { **self._initial_baseline_config, **doc['configuration'][key]['data']}
         
     def event(self, doc):
+        """To be Documented
+
+        Args:
+            doc (_type_): _description_
+        """        
         
         descriptor = self._descriptors[doc['descriptor']]     
         
@@ -276,16 +279,19 @@ class ELogCallback(CallbackBase):
             
         # Do something
     def stop(self, doc):
+        """To be Documented
 
-                
-        
-            
+        Args:
+            doc (_type_): _description_
+        """        
         if self._eLog_id_num != None:
             writeToELog(self._stop_template.render(doc),self._eLog_id_num)
             self._eLog_id_num = None
                 
 
     def clear(self):
+        """To be Documented
+        """        
         self._baseline_toggle = True
         self._eLog_id_num = None
         self._descriptors.clear()
@@ -296,12 +302,15 @@ class ELogCallback(CallbackBase):
   
 
 def authenticate_session(RE,db,lock_list=None):
+    """Authenticate to an eLog session (Note that db is passed but not used...)
 
-    """
-    RE: run engine object
-    db: databroker catalog
-    lock_list: list of resource locks, optional
-    """
+    Args:
+        RE (_type_): run engine object
+        db (_type_): databroker catalog
+        lock_list (_type_, optional): list of resource locks. Defaults to None.
+
+    """    
+
     if 'eLog_id_num' in RE.md:
         print("Already logged in")
         return
@@ -330,11 +339,12 @@ def authenticate_session(RE,db,lock_list=None):
     
 
 def logout_session(RE,lock_list=None):
-    """
-    RE: run engine object
-    lock_list: list of resource locks, optional
-    """
-    
+    """Log out from a elog session
+
+    Args:
+        RE (_type_): run engine object
+        lock_list (_type_, optional): list of resource locks. Defaults to None.
+    """      
     if lock_list!=None:
         teardown_my_shell(RE,lock_list)
         

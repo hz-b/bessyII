@@ -2,6 +2,14 @@ from bluesky.run_engine import RunEngine
 from ophyd import Kind,Device 
 
 class RunEngineBessy(RunEngine):
+    """RunEngine modifications at BESYYII
+
+    List of modifications:
+    - silent detectors: bla bla bla
+    - bla bla bla
+
+
+    """    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._silent_det = []
