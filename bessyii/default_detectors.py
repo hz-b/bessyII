@@ -27,7 +27,7 @@ from functools import wraps
 from bluesky.plan_stubs import (open_run, close_run, mv, pause, trigger_and_read)
 
 
-def plan_mutator(plan, msg_proc):
+def bessy_plan_mutator(plan, msg_proc):
     """
     Alter the contents of a plan on the fly by changing or inserting messages.
 
@@ -317,10 +317,10 @@ def change_kind(plan, devices):
                 return None, None
 
         # Apply nested mutations.
-        plan1 = plan_mutator(plan, insert_after_open)
-        plan2 = plan_mutator(plan1, insert_read_before_read_after_create)
-        plan3 = plan_mutator(plan2, insert_trigger_before_wait_after_trigger)
-        plan4 = plan_mutator(plan3, insert_before_close)
+        plan1 = bessy_plan_mutator(plan, insert_after_open)
+        plan2 = bessy_plan_mutator(plan1, insert_read_before_read_after_create)
+        plan3 = bessy_plan_mutator(plan2, insert_trigger_before_wait_after_trigger)
+        plan4 = bessy_plan_mutator(plan3, insert_before_close)
         
         #finally, stage the silent_det list
         plan5 = stage_wrapper(plan4,silent_det)
