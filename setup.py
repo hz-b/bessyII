@@ -16,7 +16,7 @@ setup(name='bessyii',
       packages=find_packages(exclude=['docs', 'tests']),
       install_requires=[
           'ophyd==1.6.2',
-          'bluesky==1.7.0',
+          'bluesky>=1.7.0',
           'msgpack',
           'event_model',
           'numpy'
