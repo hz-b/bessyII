@@ -1,4 +1,4 @@
-from bluesky.plan_stubs import mv
+from bluesky.plan_stubs import mv, configure
 from bluesky.utils import (
     separate_devices,
     all_safe_rewind,
@@ -109,7 +109,8 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                 
 
                 #Perform the configuration for that device
-                device.configure(configuration_dict)
+                ret = yield from bps.config(configuration_dict)
+                status_objects.append(ret)
             
             
                      
