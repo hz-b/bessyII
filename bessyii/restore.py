@@ -109,7 +109,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                 
 
                 #Perform the configuration for that device
-                ret = yield from bps.config(configuration_dict)
+                ret = yield from config(configuration_dict)
                 status_objects.append(ret)
             
             
