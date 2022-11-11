@@ -1,4 +1,4 @@
-from bluesky.plan_stubs import mv
+from bluesky.plan_stubs import mv, configure
 from bluesky.utils import (
     separate_devices,
     all_safe_rewind,
@@ -52,11 +52,16 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
             if device.parent not in devices:
                 
                 #find the name of the device containing this device in the list
-                
+                found_config = False
                 if device.parent == None: # if this device is a top level parent then we can only configure it if it's in the baseline
                     
                     #get the configuration x_array from the baseline
-                    configuration = baseline_stream.config[device.name].read()
+                    if device.name in baseline_stream.config:
+                        found_config = True
+                        configuration = baseline_stream.config[device.name].read()
+                    else:
+                        print((f"There is no device in the baseline matching {device.name}"))
+       
                 
                 else:   # this is a child without parents in the list (but possibly parents in the baseline)
                     
@@ -80,36 +85,40 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                             found_config = True
                             break
                             
-                    if not found_config:
-                        
-                        raise KeyError(f"There is no device in the baseline matching {device.name}")
-                        
+                if not found_config:
 
-                #For each configuration attribute in our device, create a dict of the attribute name and the value we need to set it to
-                configuration_dict = {}
-                
-                #create a list of signal names of the top level device
-                name = (device.name+'.')
-                signal_names = []
-                for signal in device.get_instantiated_signals():
-
-                    if hasattr(signal[1] ,'write_access'):
-                        if signal[1].write_access:
-                            signal_names.append(signal[0].replace(name,''))
-
+                    #raise KeyError(f"There is no device in the baseline matching {device.name}")
+                    print((f"There is no device in the baseline matching {device.name}"))
                     
-                for configuration_attr in device.configuration_attrs:
-                    
-                    #We only want to restore if the attribute is a signal
-                    if configuration_attr in signal_names:
+                else:
                         
-                        
-                        
-                        configuration_dict[configuration_attr] = configuration[device.name +'_'+configuration_attr.replace('.','_')].values[0]
-                
 
-                #Perform the configuration for that device
-                device.configure(configuration_dict)
+                    #For each configuration attribute in our device, create a dict of the attribute name and the value we need to set it to
+                    configuration_dict = {}
+
+                    #create a list of signal names of the top level device
+                    name = (device.name+'.')
+                    signal_names = []
+                    for signal in device.get_instantiated_signals():
+
+                        if hasattr(signal[1] ,'write_access'):
+                            if signal[1].write_access:
+                                signal_names.append(signal[0].replace(name,''))
+
+
+                    for configuration_attr in device.configuration_attrs:
+
+                        #We only want to restore if the attribute is a signal
+                        if configuration_attr in signal_names:
+
+
+
+                            configuration_dict[configuration_attr] = configuration[device.name +'_'+configuration_attr.replace('.','_')].values[0]
+
+
+                    #Perform the configuration for that device
+                    ret = yield from configure(device,configuration_dict)
+                    status_objects.append(ret)
             
             
                      
