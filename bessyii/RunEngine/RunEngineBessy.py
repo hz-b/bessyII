@@ -1,5 +1,6 @@
 from bluesky.run_engine import RunEngine
 from ophyd import Kind,Device 
+import inspect
 
 class RunEngineBessy(RunEngine):
     """RunEngine modifications at BESYYII
@@ -15,6 +16,11 @@ class RunEngineBessy(RunEngine):
         self._silent_det = []
     
     def __call__(self, *args, **metadata_kw):
+
+        # add call command metadata
+        metadata_kw.setdefault('commad_elog_test',inspect.stack()[1].code_context)
+        # add call command metadata end
+
         kind_map = {} # dictionary with original hinted/normal states. 
         #make sure the plan has detectors. if not we don't need silent detectors
         if 'detectors' in args[0].gi_frame.f_locals:
@@ -45,4 +51,4 @@ class RunEngineBessy(RunEngine):
                 elif hasattr(det,"kind"): 
                     det.kind = kind_map[det]
                 else:
-                    raise AssertionError("Unknown kind of detector in the saved list - this should never happen!")  
+                    raise AssertionError("Unknown kind of detector in the saved list - this should never happen!")
