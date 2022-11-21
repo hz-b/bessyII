@@ -123,9 +123,32 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
             
                      
         #Restore the setpoint (we will work out readback later)
+                    
+        pos_dict = {}
+        for key, data in baseline_data:
+
+            if "setpoint" in key
+                pos_dict[key] = data.values[0]
+
+
         for device in devices:
+
+            #check if the device has a method restore()
             
-            #check that the device is a positioner
+            if hasattr(device, "restore"):
+
+                if callable(device.restore):
+
+                    #if it has a restore method then call it, pass the entire baseline dict. It is expected to search this and check what it needs to do
+
+                    yield Msg('restore', device, pos_dict, group = 'restore')
+            
+            else:
+
+                pass
+
+            """
+            #check that the device is a positioner          
             if isinstance(device,PositionerBase):
                 
                 # if it's a PseudoPositioner then write a position 
@@ -163,6 +186,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                             print(f"found {signal_name} in baseline, restoring to {setpoint_val}")
                             ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
                             status_objects.append(ret)
+                """
 
 
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
@@ -175,8 +199,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
 
 # Create a function specifically for switching beamlines. Put it in a class so we can import it from a package
 
-from databroker.queries import TimeRange
-from ophyd import EpicsSignalRO
+
 
 from bluesky.utils import (
     separate_devices,
@@ -287,7 +310,6 @@ class RestoreHelpers:
                     raise ValueError(f'The uid {uid} was not taken at end_station {end_station}')
                 
                       
-        baseline = run.baseline
                
         
         #close the shutter

@@ -1,9 +1,11 @@
 import pytest
 from bessyii.restore import restore, RestoreHelpers
 from ophyd.sim import motor, noisy_det
-from ophyd import SoftPositioner, Signal, Device, Component as Cpt
+from ophyd import SoftPositioner, Signal, Component as Cpt
+from bessyii_devices.device import BESSYDevice as Device
 from bessyii.default_detectors import BessySupplementalData, init_silent, close_silent
-from bluesky import RunEngine
+from bessyii.RunEngine.RunEngineBessy import RunEngineBessy as RunEngine
+#from bluesky import RunEngine
 from databroker.v2 import temp
 
 
@@ -31,7 +33,7 @@ RE.md["beamline"] = beamline_name
 
 ##set up some test devices
 from ophyd.sim import SynAxis
-from ophyd import Device, Component as Cpt
+from ophyd import Component as Cpt
 from bessyii_devices.positioners import PVPositionerDone
 import time as ttime
 import numpy as np

@@ -1,48 +1,57 @@
 from bluesky.run_engine import RunEngine
-from ophyd import Kind,Device 
+import asyncio
+try:
+    from asyncio import current_task
+except ImportError:
+    # handle py < 3,7
+    from asyncio.tasks import Task
+    current_task = Task.current_task
+    del Task
 
 class RunEngineBessy(RunEngine):
     """RunEngine modifications at BESYYII
-
-    List of modifications:
-    - silent detectors: bla bla bla
-    - bla bla bla
 
 
     """    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._silent_det = []
+
     
-    def __call__(self, *args, **metadata_kw):
-        kind_map = {} # dictionary with original hinted/normal states. 
-        #make sure the plan has detectors. if not we don't need silent detectors
-        if 'detectors' in args[0].gi_frame.f_locals:
-            # NOTE: we use detector instance is the key - to avoid problem with hacked component names (e.g. keithley sets readback name to the device name)
-            for det in self._silent_det:
-                if not det in args[0].gi_frame.f_locals['detectors'] and det not in args[0].gi_frame.f_locals['args']:
-                    # handle Device(s) explicitly - for all components marked as hinted set then to normal
-                    if isinstance(det, Device):
-                        hinted_components = [cc for cc in det.component_names if getattr(det, cc).kind == Kind.hinted]
-                        kind_map[det]=hinted_components
-                        for cc in hinted_components:
-                            getattr(det, cc).kind = Kind.normal
-                    # duck typing for other types - if it has field called "kind" than change it to "Kind.normal"
-                    elif hasattr(det,"kind"):
-                        kind_map[det] = det.kind
-                        det.kind = Kind.normal
-                
-            args[0].gi_frame.f_locals['detectors'] += self._silent_det
-        try: # wrap it in try-finally - we want to restore original state even if there was an error in executing run engine
-            super().__call__(*args, **metadata_kw)
-        finally:
-            for det in kind_map:
-                # restoring all marked/modified detectors
-                if isinstance(det, Device):
-                    for cc in  kind_map[det]:
-                        getattr(det, cc).kind = Kind.hinted # we explicitly selected hinted components before, so we it set now back to hinted.
-                # duck typing for other types - if it has field called "kind" than change it to whatever it was
-                elif hasattr(det,"kind"): 
-                    det.kind = kind_map[det]
-                else:
-                    raise AssertionError("Unknown kind of detector in the saved list - this should never happen!")  
+        self.register_command("restore",self._restore)
+
+    async def _restore(self, msg):
+        """
+        restore a device and cache the returned status object.
+
+        Expected message object is
+
+            Msg('restore', obj, *args, **kwargs)
+
+        where arguments are passed through to `obj.restore(*args, **kwargs)`.
+        """
+        kwargs = dict(msg.kwargs)
+        group = kwargs.pop('group', None)
+        self._movable_objs_touched.add(msg.obj)
+
+        if hasattr(msg.obj, "restore"):
+
+            ret = msg.obj.restore(*msg.args, **kwargs)
+            p_event = asyncio.Event(loop=self._loop_for_kwargs)
+            pardon_failures = self._pardon_failures
+
+            def done_callback(status=None):
+                self.log.debug("The object %r reports restore is done "
+                            "with status %r", msg.obj, ret.success)
+                self._loop.call_soon_threadsafe(
+                    self._status_object_completed, ret, p_event, pardon_failures)
+
+            try:
+                ret.add_callback(done_callback)
+            except AttributeError:
+                # for ophyd < v0.8.0
+                ret.finished_cb = done_callback
+            self._groups[group].add(p_event.wait)
+            self._status_objs[group].add(ret)
+
+            return ret
+
