@@ -6,7 +6,6 @@ from bluesky.utils import (
     ensure_generator,
     short_uid as _short_uid,
 )
-from ophyd import PVPositioner, PositionerBase, PseudoPositioner
 
 import bluesky.preprocessors as bpp
 from bluesky.protocols import Status
@@ -125,9 +124,9 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
         #Restore the setpoint (we will work out readback later)
                     
         pos_dict = {}
-        for key, data in baseline_data:
+        for key, data in baseline_data.items():
 
-            if "setpoint" in key
+            if "setpoint" in key:
                 pos_dict[key] = data.values[0]
 
 
@@ -254,6 +253,7 @@ class RestoreHelpers:
         """
         
         #Search the database for the most recent run performed that has this beamline name
+        run = []
         if uid == None and name == None:
             
             results = self._db
@@ -319,6 +319,7 @@ class RestoreHelpers:
             
         
         
-        #Restore the beamline to the settings described in this run        
-        yield from restore(baseline, devices, md=md)
+        #Restore the beamline to the settings described in this run
+        if run:        
+            yield from restore(run.baseline, devices, md=md)
     

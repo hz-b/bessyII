@@ -1,7 +1,7 @@
 import pytest
 from bessyii.restore import restore, RestoreHelpers
 from ophyd.sim import motor, noisy_det
-from ophyd import SoftPositioner, Signal, Component as Cpt
+from ophyd import Signal, Component as Cpt
 from bessyii_devices.device import BESSYDevice as Device
 from bessyii.default_detectors import BessySupplementalData, init_silent, close_silent
 from bessyii.RunEngine.RunEngineBessy import RunEngineBessy as RunEngine
@@ -85,6 +85,8 @@ class SimPositionerDone(SynAxis, PVPositionerDone):
         super().__init__(name=name, parent=parent, labels=labels, kind=kind,readback_func=readback_func,delay=delay,precision=precision,
                          **kwargs)
         self.set(value)
+
+
     
     
     
@@ -128,12 +130,12 @@ stage = StageOfStage(name = 'stage')
 #Create a PseudoPositioner
 
 from ophyd.pseudopos import (
-    PseudoPositioner,
     PseudoSingle,
     pseudo_position_argument,
     real_position_argument
 )
-from ophyd import Component, SoftPositioner
+from bessyii_devices.positioners import PseudoPositionerBessy as PseudoPositioner
+from ophyd import Component
 
 
 class Pseudo3x3(PseudoPositioner):
@@ -166,7 +168,7 @@ class Pseudo3x3(PseudoPositioner):
             pseudo2=-real_pos.real2,
             pseudo3=-real_pos.real3
         )
-
+    
 
 class M4SMUSim(Pseudo3x3):
 
@@ -485,6 +487,8 @@ def test_pseudo_positioner():
 def test_search_restore():
     
     current_end_station = light_status.get()
+
+    print(current_end_station)
     
     #create the device list 
     device_list = [m1,m2,stage.a.x, stage.b.y]
