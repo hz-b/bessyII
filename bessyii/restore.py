@@ -44,23 +44,23 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
     def inner_restore():
         status_objects = []
         
-        #Restore Configuration
+
+
         for device in devices:
-            
+
+            restore_dict = {}
+
+            #find out if it's got parents
             #Check that this device does not have a parent in the list of devices
             if device.parent not in devices:
+                found_config = False
                 
                 #find the name of the device containing this device in the list
-                found_config = False
                 if device.parent == None: # if this device is a top level parent then we can only configure it if it's in the baseline
                     
                     #get the configuration x_array from the baseline
-                    if device.name in baseline_stream.config:
-                        found_config = True
-                        configuration = baseline_stream.config[device.name].read()
-                    else:
-                        print((f"There is no device in the baseline matching {device.name}"))
-       
+                    configuration = baseline_stream.config[device.name].read()
+                    found_config = True
                 
                 else:   # this is a child without parents in the list (but possibly parents in the baseline)
                     
@@ -85,52 +85,26 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                             break
                             
                 if not found_config:
-
-                    #raise KeyError(f"There is no device in the baseline matching {device.name}")
-                    print((f"There is no device in the baseline matching {device.name}"))
                     
-                else:
-                        
+                    raise KeyError(f"There is no device in the baseline matching {device.name}")
+        
 
-                    #For each configuration attribute in our device, create a dict of the attribute name and the value we need to set it to
-                    configuration_dict = {}
+    
+            # Make a dictionary that can be passed to device.restore
+            for conf_attr in device.configuration_attrs:
 
-                    #create a list of signal names of the top level device
-                    name = (device.name+'.')
-                    signal_names = []
-                    for signal in device.get_instantiated_signals():
+                conf_attr_sig_name =device.name +"_"+conf_attr.replace(".","_")
 
-                        if hasattr(signal[1] ,'write_access'):
-                            if signal[1].write_access:
-                                signal_names.append(signal[0].replace(name,''))
-
-
-                    for configuration_attr in device.configuration_attrs:
-
-                        #We only want to restore if the attribute is a signal
-                        if configuration_attr in signal_names:
-
-
-
-                            configuration_dict[configuration_attr] = configuration[device.name +'_'+configuration_attr.replace('.','_')].values[0]
-
-
-                    #Perform the configuration for that device
-                    ret = yield from configure(device,configuration_dict)
-                    status_objects.append(ret)
             
+
+                if conf_attr_sig_name in configuration:
+
+                    restore_dict[conf_attr_sig_name] = configuration[conf_attr_sig_name].values[0]
             
-                     
-        #Restore the setpoint (we will work out readback later)
-                    
-        pos_dict = {}
-        for key, data in baseline_data.items():
+            for key, data in baseline_data.items():
 
-            if "setpoint" in key:
-                pos_dict[key] = data.values[0]
-
-
-        for device in devices:
+                if "setpoint" in key and device.name in key:
+                    restore_dict[key] = data.values[0]
 
             #check if the device has a method restore()
             
@@ -140,54 +114,13 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
 
                     #if it has a restore method then call it, pass the entire baseline dict. It is expected to search this and check what it needs to do
 
-                    yield Msg('restore', device, pos_dict, group = 'restore')
+                    yield Msg('restore', device, restore_dict, group = 'restore')
             
             else:
 
                 pass
 
-            """
-            #check that the device is a positioner          
-            if isinstance(device,PositionerBase):
-                
-                # if it's a PseudoPositioner then write a position 
-                if isinstance(device,PseudoPositioner):
-                    
-                    # create a position dictionary
-                    position_dict = {}
-                    
-                    #calculate the values that the real positioners were set to
-                    for real_axis in device.real_positioners:
-                        
-                        signal_name = real_axis.setpoint.name
-                        signal_value = baseline_data[signal_name].values[0]
-                        position_dict[real_axis._attr_name] = signal_value
-                    
-                    #From that real position derive the pseudo position we need to drive to
-                    pseudo_pos = device.inverse(position_dict)
-                    
-                    #Use that position dictionary as the setpoint
-                    dev_obj = device
-                    setpoint_val = pseudo_pos
-                    print(f"found {signal_name} in baseline, restoring to {position_dict}")
-                    ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
-                    status_objects.append(ret)
-                        
-                #if it's not a PseudoPositioner then write the setpoint in the baseline again 
-                else:
-                    for attr in device.read_attrs:
-                        if "setpoint" in str(attr):                         
-                            signal_name = device.name + '_'+ attr
-                          
-
-                            dev_obj = device
-                            setpoint_val = baseline_data[signal_name].values[0]
-                            print(f"found {signal_name} in baseline, restoring to {setpoint_val}")
-                            ret = yield Msg('set', dev_obj, setpoint_val, group = 'restore')
-                            status_objects.append(ret)
-                """
-
-
+    
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
 

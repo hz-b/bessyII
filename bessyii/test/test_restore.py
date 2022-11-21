@@ -107,7 +107,7 @@ def switch(end_station,devices, uid=None,md=None):
         
         
         
-from ophyd import EpicsMotor, Signal, Device, Component as Cpt
+from ophyd import EpicsMotor, Signal, Component as Cpt
 
 
 
@@ -122,6 +122,59 @@ class StageOfStage(Device):
     a = Cpt(Stage)
     b= Cpt(Stage)
     config_param = Cpt(Signal, kind='config')
+
+from collections import OrderedDict, namedtuple
+from collections.abc import Iterable, MutableSequence
+from enum import Enum
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    DefaultDict,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
+class SimMono(StageOfStage):
+
+    def restore(self, d: Dict[str, Any]):
+
+        """
+        parameter_dict : ordered_dict
+
+        A dictionary containing names of signals (from a baseline reading)
+        """
+
+        #first pass determine which parameters are configuration parameters
+        
+        seen_attrs = []
+
+        for config_attr in self.configuration_attrs:
+
+            #Make the key as it would be found in d
+
+            param_name = self.name + "_" + config_attr.replace('.','_')
+            
+            if param_name in d:
+                if hasattr(self,config_attr+'.write_access'):
+                    if getattr(self,config_attr+'.write_access'):
+                        getattr(self, config_attr).set(d[param_name]).wait()
+
+        #second pass. We know we are a positioner, so let's restore the position
+                
+        #In this test device we will always restore a.x then a.y, then b.y then b.x
+        self.a.x.move(d[self.a.x.name +  "_setpoint"]).wait() # we will wait for it to complete
+        self.a.y.move(d[self.a.y.name +  "_setpoint"]).wait()
+        self.b.y.move(d[self.b.y.name +  "_setpoint"]).wait() # we will wait for it to complete
+        sta = self.b.x.move(d[self.b.x.name +  "_setpoint"])
+        return sta
+
+sim_mono = SimMono(name = 'sim_mono')
 
 stage = StageOfStage(name = 'stage')
 
@@ -184,7 +237,7 @@ m4_smu = M4SMUSim(name='m4_smu')
 # Create a baseline
 sd = BessySupplementalData()
 
-sd.baseline = [m1, m2, stage,p3,m4_smu]
+sd.baseline = [m1, m2, stage,p3,m4_smu,sim_mono]
 
 # Add the beamline status PV
 sd.light_status = light_status
@@ -226,7 +279,14 @@ for k, v in stage.a.read_configuration().items():
 stage_a_x_initial_config_values = {}
 for k, v in stage.a.x.read_configuration().items():
     stage_a_x_initial_config_values[k]=v['value']
-    
+
+#Move the sim mono somewhere:
+sim_mono_initial_values = [1,2,3,4]
+sim_mono.a.x.move(sim_mono_initial_values[0])
+sim_mono.a.y.move(sim_mono_initial_values[1])
+sim_mono.b.x.move(sim_mono_initial_values[2])
+sim_mono.b.y.move(sim_mono_initial_values[3])
+
 #Perform a plan to add something to the databroker
 from bluesky.plans import scan
 
@@ -235,13 +295,13 @@ RE(scan([noisy_det], motor, -1,1,2))
 #get the uid
 uid = db[-1].metadata['start']['uid'][:8]
 
+
    
 ## define the tests
 def test_restore_configuration_parent():
     
     #test whether we can restore the configuration of a parent device (and all it's children)
-    
-    
+
     #Move the motors to some other positions
     new_config = [2,3,4,5,6,7]
     m1.velocity.set(new_config[0])
@@ -267,8 +327,9 @@ def test_restore_configuration_parent():
     for k, v in stage.read_configuration().items():
         stage_config_values[k]=v['value']
 
-    
     assert stage_config_values == stage_initial_config_values
+
+
     
 ## define the tests
 def test_restore_configuration_child_with_parent_and_child():
@@ -568,6 +629,39 @@ def test_close_shutter():
     RE(restore_plan)
     
     assert sim_shutter.readback.get() == 0
+
+def test_sim_pgm():
+
+
+    #Run a plan to save the positions in the baseline
+    new_positions = [4,12,2,124]
+    RE(mv(sim_mono.a.x,new_positions[0], sim_mono.a.y, new_positions[1], sim_mono.b.x, new_positions[2], sim_mono.b.y, new_positions[3]))
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+    
+    device_list = [sim_mono] ## Note we are taking the top level device here which will also restore the sub components because we've defined it that way
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    #find the values 
+    restored_positions = [sim_mono.a.x.readback.get(),sim_mono.a.y.readback.get(),sim_mono.b.x.readback.get(),sim_mono.b.y.readback.get()]
+
+    assert restored_positions == sim_mono_initial_values
+
+    #Also check that the positioners were restored in the correct order
+    a_x_timestamp = sim_mono.a.x.readback.read()[sim_mono.a.x.readback.name]['timestamp']
+    a_y_timestamp = sim_mono.a.y.readback.read()[sim_mono.a.y.readback.name]['timestamp']
+    b_x_timestamp = sim_mono.b.x.readback.read()[sim_mono.b.x.readback.name]['timestamp']
+    b_y_timestamp = sim_mono.b.y.readback.read()[sim_mono.b.y.readback.name]['timestamp']
+
+    #In this test device we will always restore a.x then a.y, then b.y then b.x
+    assert a_x_timestamp < a_y_timestamp < b_y_timestamp < b_x_timestamp
+
+
+
+
+
     
     
     

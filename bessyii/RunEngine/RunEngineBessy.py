@@ -45,13 +45,13 @@ class RunEngineBessy(RunEngine):
                 self._loop.call_soon_threadsafe(
                     self._status_object_completed, ret, p_event, pardon_failures)
 
-            try:
-                ret.add_callback(done_callback)
-            except AttributeError:
-                # for ophyd < v0.8.0
-                ret.finished_cb = done_callback
-            self._groups[group].add(p_event.wait)
-            self._status_objs[group].add(ret)
 
-            return ret
+            if ret: #if we are actually moving any movers
+                
+                ret.add_callback(done_callback)
+
+                self._groups[group].add(p_event.wait)
+                self._status_objs[group].add(ret)
+
+                return ret
 
