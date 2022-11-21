@@ -362,8 +362,51 @@ def test_restore_configuration_child_with_parent_and_child():
     for k, v in stage.a.read_configuration().items():
         stage_a_config_values[k]=v['value']
 
+
+
     
     assert stage_a_config_values == stage_a_initial_config_values
+
+## define the tests
+def test_restore_configuration_child_with_parent_and_child_and_parent_in_list():
+    
+    #test whether we can restore the configuration of a parent device (and all it's children), which sits in the middle of a device tree
+    
+    
+    #Move the motors to some other positions
+    new_config = [2,3,4,5,6,7]
+    m1.velocity.set(new_config[0])
+    m2.velocity.set(new_config[1])
+    stage.a.x.velocity.set(new_config[2])
+    stage.b.y.velocity.set(new_config[3])
+    stage.a.config_param.set(new_config[4])
+    stage.config_param.set(new_config[5])
+
+    new_positions = [0,0,0,0]
+    RE(mv(m1,new_positions[0], m2, new_positions[1], stage.a.x, new_positions[2], stage.b.y, new_positions[3]))
+
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+    
+    device_list = [stage.a,stage, stage.a.x] 
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    
+    stage_a_config_values = {}
+    for k, v in stage.a.read_configuration().items():
+        stage_a_config_values[k]=v['value']
+
+    stage_config_values = {}
+    for k, v in stage.read_configuration().items():
+        stage_config_values[k]=v['value']
+
+    
+    assert stage_a_config_values == stage_a_initial_config_values
+    assert stage_config_values == stage_initial_config_values
+
+
     
 def test_restore_configuration_child():
     
@@ -396,6 +439,10 @@ def test_restore_configuration_child():
         stage_a_x_config_values[k]=v['value']
 
     assert stage_a_x_config_values == stage_a_x_initial_config_values
+
+
+
+
     
 def test_restore_configuration_device():
     

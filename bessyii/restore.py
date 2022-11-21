@@ -49,6 +49,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
         for device in devices:
 
             restore_dict = {}
+            configuration = {}
 
             #find out if it's got parents
             #Check that this device does not have a parent in the list of devices
@@ -91,6 +92,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
 
     
             # Make a dictionary that can be passed to device.restore
+            
             for conf_attr in device.configuration_attrs:
 
                 conf_attr_sig_name =device.name +"_"+conf_attr.replace(".","_")
