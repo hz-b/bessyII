@@ -1,10 +1,8 @@
 import pytest
 from bessyii.restore import restore, RestoreHelpers
-from ophyd.sim import motor, noisy_det
-from ophyd import Signal, Component as Cpt
-from bessyii_devices.device import BESSYDevice as Device
 from bessyii.default_detectors import BessySupplementalData, init_silent, close_silent
 from bessyii.RunEngine.RunEngineBessy import RunEngineBessy as RunEngine
+
 #from bluesky import RunEngine
 from databroker.v2 import temp
 
@@ -32,71 +30,11 @@ RE.md["beamline"] = beamline_name
 
 
 ##set up some test devices
-from ophyd.sim import SynAxis
-from ophyd import Component as Cpt
-from bessyii_devices.positioners import PVPositionerDone
-import time as ttime
-import numpy as np
+from bessyii_devices.sim import SimPositionerDone,SimSMUHexapod, sim_smu, sim_hex, sim_mono, sim_motor, p3, stage,m1,m2,m3
+from ophyd.sim import noisy_det,det, motor
 
-
-
-class ConfigDev(Device):
-
-    config_param_a = Cpt(Signal, kind='config')
-    config_param_b = Cpt(Signal, kind='config')
-    config_param_c = Cpt(Signal, kind='config')
-
-class SimPositionerDone(SynAxis, PVPositionerDone):
-
-    """
-    A PVPositioner which reports done immediately AND conforms to the standard of other positioners with signals for 
-    
-    setpoint
-    readback
-    done
-    
-    
-    """
-
-    config_dev_1 = Cpt(ConfigDev, kind='config')
-    config_dev_2 = Cpt(ConfigDev, kind='config')
-
-    def _setup_move(self, position):
-        '''Move and do not wait until motion is complete (asynchronous)'''
-        self.log.debug('%s.setpoint = %s', self.name, position)
-        self.setpoint.put(position)
-        if self.actuate is not None:
-            self.log.debug('%s.actuate = %s', self.name, self.actuate_value)
-            self.actuate.put(self.actuate_value)
-        self._toggle_done()
-
-
-
-        
-    def __init__(self,
-                 name,
-                 readback_func=None,
-                 value=0,
-                 delay=0,
-                 precision=3,
-                 parent=None,
-                 labels=None,
-                 kind=None,**kwargs):
-        super().__init__(name=name, parent=parent, labels=labels, kind=kind,readback_func=readback_func,delay=delay,precision=precision,
-                         **kwargs)
-        self.set(value)
-
-
-    
-    
-    
-
-m1 = SimPositionerDone(name='m1' )
-m2 = SimPositionerDone(name='m2')
-m3 = SimPositionerDone(name='m3')
 sim_shutter = SimPositionerDone(name='sim_shutter')
-
-
+m4_smu = SimSMUHexapod(name='m4_smu')
 
 # instantiate the helper with status and shutters
 
@@ -105,134 +43,6 @@ restore_helpers = RestoreHelpers(db,beamline_name = beamline_name, shutter = sim
 def switch(end_station,devices, uid=None,md=None):
         yield from restore_helpers.switch_beamline(end_station,devices, uid=uid,md=md)
         
-        
-        
-from ophyd import EpicsMotor, Signal, Component as Cpt
-
-
-
-class Stage(Device):
-    
-    x = Cpt(SimPositionerDone)
-    y = Cpt(SimPositionerDone)
-    config_param = Cpt(Signal, kind='config')
-    
-class StageOfStage(Device):
-    
-    a = Cpt(Stage)
-    b= Cpt(Stage)
-    config_param = Cpt(Signal, kind='config')
-
-from collections import OrderedDict, namedtuple
-from collections.abc import Iterable, MutableSequence
-from enum import Enum
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    DefaultDict,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-)
-class SimMono(StageOfStage):
-
-    def restore(self, d: Dict[str, Any]):
-
-        """
-        parameter_dict : ordered_dict
-
-        A dictionary containing names of signals (from a baseline reading)
-        """
-
-        #first pass determine which parameters are configuration parameters
-        
-        seen_attrs = []
-
-        for config_attr in self.configuration_attrs:
-
-            #Make the key as it would be found in d
-
-            param_name = self.name + "_" + config_attr.replace('.','_')
-            
-            if param_name in d:
-                if hasattr(self,config_attr+'.write_access'):
-                    if getattr(self,config_attr+'.write_access'):
-                        getattr(self, config_attr).set(d[param_name]).wait()
-
-        #second pass. We know we are a positioner, so let's restore the position
-                
-        #In this test device we will always restore a.x then a.y, then b.y then b.x
-        self.a.x.move(d[self.a.x.name +  "_setpoint"]).wait() # we will wait for it to complete
-        self.a.y.move(d[self.a.y.name +  "_setpoint"]).wait()
-        self.b.y.move(d[self.b.y.name +  "_setpoint"]).wait() # we will wait for it to complete
-        sta = self.b.x.move(d[self.b.x.name +  "_setpoint"])
-        return sta
-
-sim_mono = SimMono(name = 'sim_mono')
-
-stage = StageOfStage(name = 'stage')
-
-
-
-#Create a PseudoPositioner
-
-from ophyd.pseudopos import (
-    PseudoSingle,
-    pseudo_position_argument,
-    real_position_argument
-)
-from bessyii_devices.positioners import PseudoPositionerBessy as PseudoPositioner
-from ophyd import Component
-
-
-class Pseudo3x3(PseudoPositioner):
-    """
-    Interface to three positioners in a coordinate system that flips the sign.
-    """
-    pseudo1 = Component(PseudoSingle, limits=(-10, 10), egu='a')
-    pseudo2 = Component(PseudoSingle, limits=(-10, 10), egu='b')
-    pseudo3 = Component(PseudoSingle, limits=(-10, 10), egu='c')
-    
-    #add some offset to distinguish readback and setpoint
-    real1 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
-    real2 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
-    real3 = Component(SimPositionerDone,value=0.1,readback_func=lambda x: 2*x)
-
-    @pseudo_position_argument
-    def forward(self, pseudo_pos):
-        "Given a position in the psuedo coordinate system, transform to the real coordinate system."
-        return self.RealPosition(
-            real1=-pseudo_pos.pseudo1,
-            real2=-pseudo_pos.pseudo2,
-            real3=-pseudo_pos.pseudo3
-        )
-
-    @real_position_argument
-    def inverse(self, real_pos):
-        "Given a position in the real coordinate system, transform to the pseudo coordinate system."
-        return self.PseudoPosition(
-            pseudo1=-real_pos.real1,
-            pseudo2=-real_pos.real2,
-            pseudo3=-real_pos.real3
-        )
-    
-
-class M4SMUSim(Pseudo3x3):
-
-    _real = ["real1","real2","real3"]
-    choice = Cpt(SimPositionerDone,kind='normal')
-
-p3 = Pseudo3x3(name='p3')
-
-m4_smu = M4SMUSim(name='m4_smu')
-
-
 
 # Create a baseline
 sd = BessySupplementalData()
@@ -552,12 +362,10 @@ def test_device_not_in_baseline_values():
         
 def test_pseudo_positioner():
     
-    #move the pseudo_positioner to some initial position
-    m4_smu.move(4,5,6)
+    #move the pseudo_positioner to some initial position and config
+    m4_smu.move(4,5,6,7,8,9)
+    original_position = m4_smu.position
     m4_smu.choice.move(1)
-
-    #with some initial config
-
     m4_smu.choice.config_dev_1.config_param_a.set(1)
     m4_smu.choice.config_dev_2.config_param_b.set(1)
     
@@ -565,32 +373,28 @@ def test_pseudo_positioner():
     RE(scan([noisy_det],p3.pseudo1,4,5,10))
     
     #Now move it again to a new position
-    m4_smu.move(6,7,8)
+    m4_smu.move(8,7,6,5,4,3)
+    new_position = m4_smu.position
     m4_smu.choice.move(0)
     m4_smu.choice.config_dev_1.config_param_a.set(2)
     m4_smu.choice.config_dev_2.config_param_b.set(2)
 
-
-
     baseline_stream = db[-1].baseline
-    
-    print(baseline_stream.read())
-    #Now check that we can restore the original positions
+
+    #Now check that we can restore the original positions of the choice
     RE(restore(baseline_stream,[m4_smu.choice]))
-    
+
+    assert m4_smu.position == new_position #check that the other positioners were not set
     assert m4_smu.choice.readback.get() == 1
     assert m4_smu.choice.config_dev_1.config_param_a.get() == 1
     assert m4_smu.choice.config_dev_2.config_param_b.get() == 1
 
     ##now restore the position
+    m4_smu.choice.move(0)
     RE(restore(baseline_stream,[m4_smu]))
 
-    assert m4_smu.pseudo1.setpoint.get() == 4
-    assert m4_smu.pseudo2.setpoint.get() == 5
-    assert m4_smu.pseudo3.setpoint.get() == 6
-    assert m4_smu.pseudo1.readback.get() == 8
-    assert m4_smu.pseudo2.readback.get() == 10
-    assert m4_smu.pseudo3.readback.get() == 12
+    assert m4_smu.choice.readback.get() == 0
+    assert m4_smu.position == original_position
 
 def test_search_restore():
     
