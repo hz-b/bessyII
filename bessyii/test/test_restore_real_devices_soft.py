@@ -24,10 +24,12 @@ RE.md["beamline"] = beamline_name
 
 ##set up some test devices
 from bessyii_devices.au import AU4, AU13
-from bessyii_devices.m3_m4_mirrors import SMU2
+from bessyii_devices.m3_m4_mirrors import SMU2, SMU3, Hexapod
 from bessyii_devices.sim import SimPositionerDone
 from bessyii_devices.diodes import DiodeEMIL
 from bessyii_devices.undulator import HelicalUndulator
+from bessyii_devices.pgm import PGMSoft
+
 
 
 
@@ -48,6 +50,9 @@ ue48.wait_for_connection()
 ue48_au1 = AU13("WAUY01U012L:", name = "ue48_au1")
 ue48_au1.wait_for_connection()
 
+ue48_pgm = PGMSoft("ue481pgm1:", name="ue48_pgm")
+ue48_pgm.wait_for_connection()
+
 #Create the baseline
 from bessyii.default_detectors import BessySupplementalData
 
@@ -57,10 +62,9 @@ restore_helpers = RestoreHelpers(db,beamline_name = beamline_name, shutter = sim
 def switch(end_station,devices, uid=None,md=None):
         yield from restore_helpers.switch_beamline(end_station,devices, uid=uid,md=md)
         
-
 # Create a baseline
 sd = BessySupplementalData()
-sd.baseline = [ue48,ue48_au1,ue48_au4_sissy,ue48_m4_sissy,ue48_sissy_diode_2]
+sd.baseline = [ue48,ue48_au1,ue48_pgm,ue48_au4_sissy,ue48_m4_sissy,ue48_sissy_diode_2]
 
 # Add the beamline status PV
 sd.light_status = light_status
@@ -258,6 +262,66 @@ def test_restore_au13():
 
     for key, item in new_conf.items():
 
-        assert new_conf[key]["value"] == init_conf[key]["value"]   
+        assert new_conf[key]["value"] == init_conf[key]["value"] 
+
+@pytest.mark.skip(reason="this works")
+def test_restore_pgm():
+    
+    #read the initial configuration of the device 
+
+    init_conf = ue48_pgm.read_configuration()
+    init_au4 = ue48_au4_sissy.top.user_setpoint.get()
+    init_pos_en = ue48_pgm.en.setpoint.get()
+    init_pos_grating = ue48_pgm.grating_translation.setpoint.get() #note we are looking at the absolute value!
+    init_pos_slit = ue48_pgm.slit.setpoint.get()
+
+    #Move the motors to some other positions
+    ue48_pgm.ID_on.set(0) #id off
+    
+    ue48_pgm.grating_translation.move(43).wait()
+    ue48_pgm.en.move(init_pos_en+1).wait()
+
+    if ue48_pgm.slit.branch.get() == "CAT":
+
+        ue48_pgm.slit.branch.set("STXM")
+    
+    else:
+
+        ue48_pgm.slit.branch.set("CAT")
+
+    init_pos_slit = ue48_pgm.slit.setpoint.get()
+
+    ue48_pgm.slit.move(init_pos_slit+1).wait()
+
+    ue48_au4_sissy.top.move(12).wait()
     
 
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+    
+    device_list = [ue48_pgm,ue48_au4_sissy.top] 
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    #read the new conf
+    new_conf = ue48_pgm.read_configuration()
+
+    #Check that all the positions have been restored
+    assert ue48_pgm.en.setpoint.get() == init_pos_en 
+    assert ue48_pgm.grating_translation.setpoint.get() == init_pos_grating
+    assert ue48_pgm.slit.setpoint.get() == init_pos_slit
+    assert ue48_au4_sissy.top.user_setpoint.get() == init_au4
+    #Check that all the positions have been restored
+    for key, item in new_conf.items():
+
+        assert new_conf[key]["value"] == init_conf[key]["value"]  
+
+    #finally check that the order that things were set is correct
+    
+    en_time = ue48_pgm.en.setpoint.read()[ue48_pgm.en.setpoint.name]['timestamp']
+    grating_time = ue48_pgm.grating_translation.setpoint.read()[ue48_pgm.grating_translation.setpoint.name]['timestamp']
+    slit_time = ue48_pgm.slit.setpoint.read()[ue48_pgm.slit.setpoint.name]['timestamp']
+    
+    #Check that the grating is set first, then the slit, then the energy
+    assert grating_time < slit_time < en_time 

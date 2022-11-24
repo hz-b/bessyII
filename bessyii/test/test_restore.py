@@ -501,10 +501,10 @@ def test_sim_pgm():
     assert restored_positions == sim_mono_initial_values
 
     #Also check that the positioners were restored in the correct order
-    a_x_timestamp = sim_mono.a.x.readback.read()[sim_mono.a.x.readback.name]['timestamp']
-    a_y_timestamp = sim_mono.a.y.readback.read()[sim_mono.a.y.readback.name]['timestamp']
-    b_x_timestamp = sim_mono.b.x.readback.read()[sim_mono.b.x.readback.name]['timestamp']
-    b_y_timestamp = sim_mono.b.y.readback.read()[sim_mono.b.y.readback.name]['timestamp']
+    a_x_timestamp = sim_mono.a.x.setpoint.read()[sim_mono.a.x.setpoint.name]['timestamp']
+    a_y_timestamp = sim_mono.a.y.setpoint.read()[sim_mono.a.y.setpoint.name]['timestamp']
+    b_x_timestamp = sim_mono.b.x.setpoint.read()[sim_mono.b.x.setpoint.name]['timestamp']
+    b_y_timestamp = sim_mono.b.y.setpoint.read()[sim_mono.b.y.setpoint.name]['timestamp']
 
     #In this test device we will always restore a.x then a.y, then b.y then b.x
     assert a_x_timestamp < a_y_timestamp < b_y_timestamp < b_x_timestamp
