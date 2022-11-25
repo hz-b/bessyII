@@ -114,7 +114,7 @@ def test_restore_diodes_and_filters():
         assert new_conf[key]["value"] == init_conf[key]["value"]
 
 
-@pytest.mark.skip(reason="this works")
+#@pytest.mark.skip(reason="this works")
 def test_restore_au4():
     
     #test whether we can restore the configuration of a parent device (and all it's children)
@@ -122,10 +122,11 @@ def test_restore_au4():
     #read the initial configuration of the device 
 
     init_conf = ue48_au4_sissy.read_configuration()
-    init_pos = ue48_au4_sissy.top.user_setpoint.get()
+    init_pos_top = ue48_au4_sissy.top.user_setpoint.get()
+    init_pos_bottom = ue48_au4_sissy.bottom.user_setpoint.get()
     #Move the motors to some other positions
 
-    RE(mv(ue48_au4_sissy.top,15))
+    RE(mv(ue48_au4_sissy.top,15,ue48_au4_sissy.bottom,15))
 
     ue48_au4_sissy.top.velocity.set(3)
     ue48_au4_sissy.bottom.velocity.set(3)
@@ -135,14 +136,15 @@ def test_restore_au4():
     #Now attempt to restore the original positions
     baseline_stream = db[uid].baseline
     
-    device_list = [ue48_au4_sissy,ue48_au4_sissy.top] 
+    device_list = [ue48_au4_sissy,ue48_au4_sissy.top,ue48_au4_sissy.bottom] 
     #attempt the restore
     RE(restore(baseline_stream, device_list))
 
     #read the current conf
     new_conf = ue48_au4_sissy.read_configuration()
 
-    assert ue48_au4_sissy.top.user_setpoint.get() == init_pos
+    assert ue48_au4_sissy.top.user_setpoint.get() == init_pos_top
+    assert ue48_au4_sissy.bottom.user_setpoint.get() == init_pos_bottom
 
     for key, item in new_conf.items():
 
@@ -264,7 +266,7 @@ def test_restore_au13():
 
         assert new_conf[key]["value"] == init_conf[key]["value"] 
 
-#@pytest.mark.skip(reason="this works")
+@pytest.mark.skip(reason="this works")
 def test_restore_pgm():
     
     #read the initial configuration of the device 
