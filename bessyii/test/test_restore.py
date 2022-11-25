@@ -47,7 +47,7 @@ def switch(end_station,devices, uid=None,md=None):
 # Create a baseline
 sd = BessySupplementalData()
 
-sd.baseline = [m1, m2, stage,p3,m4_smu,sim_mono]
+sd.baseline = [m1, m2, stage,p3,m4_smu,sim_mono,sim_hex]
 
 # Add the beamline status PV
 sd.light_status = light_status
@@ -481,13 +481,35 @@ def test_close_shutter():
     
     assert sim_shutter.readback.get() == 0
 
+def test_sim_hex():
+
+
+    sim_hex_initial_values = sim_hex.position
+
+
+    sim_hex.move(1,2,3,4,5,6)
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+
+    device_list = [sim_hex]
+
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    sim_hex_new_values = sim_hex.position
+
+    assert sim_hex_new_values == sim_hex_initial_values
+
+    
+
 def test_sim_pgm():
 
     sim_mono_initial_values = [sim_mono.grating_translation.readback.get(),sim_mono.slit.readback.get(),sim_mono.en.readback.get()]
     m1_init = m1.readback.get()
     
 
-    #Run a plan to save the positions in the baseline
+    
     sim_mono.grating_translation.settle_time = 1
     sim_mono.slit.settle_time = 1
     sim_mono.en.settle_time = 1
