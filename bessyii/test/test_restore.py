@@ -483,32 +483,41 @@ def test_close_shutter():
 
 def test_sim_pgm():
 
+    sim_mono_initial_values = [sim_mono.grating_translation.readback.get(),sim_mono.slit.readback.get(),sim_mono.en.readback.get()]
+    m1_init = m1.readback.get()
+    
 
     #Run a plan to save the positions in the baseline
-    new_positions = [4,12,2,124]
-    RE(mv(sim_mono.a.x,new_positions[0], sim_mono.a.y, new_positions[1], sim_mono.b.x, new_positions[2], sim_mono.b.y, new_positions[3]))
+    sim_mono.grating_translation.settle_time = 1
+    sim_mono.slit.settle_time = 1
+    sim_mono.en.settle_time = 1
+    m1.settle_time = 0
+    new_positions = [4,12,2]
+    RE(mv(sim_mono.grating_translation,new_positions[0], sim_mono.slit, new_positions[1], sim_mono.en, new_positions[2]))
+
+    m1.move(5)
 
     #Now attempt to restore the original positions
     baseline_stream = db[uid].baseline
     
-    device_list = [sim_mono] ## Note we are taking the top level device here which will also restore the sub components because we've defined it that way
+    device_list = [sim_mono,m1] ## Note we are taking the top level device here which will also restore the sub components because we've defined it that way
     #attempt the restore
     RE(restore(baseline_stream, device_list))
 
     #find the values 
-    restored_positions = [sim_mono.a.x.readback.get(),sim_mono.a.y.readback.get(),sim_mono.b.x.readback.get(),sim_mono.b.y.readback.get()]
+    restored_positions = [sim_mono.grating_translation.readback.get(),sim_mono.slit.readback.get(),sim_mono.en.readback.get()]
 
     assert restored_positions == sim_mono_initial_values
+    assert m1.readback.get() == m1_init
 
     #Also check that the positioners were restored in the correct order
-    a_x_timestamp = sim_mono.a.x.setpoint.read()[sim_mono.a.x.setpoint.name]['timestamp']
-    a_y_timestamp = sim_mono.a.y.setpoint.read()[sim_mono.a.y.setpoint.name]['timestamp']
-    b_x_timestamp = sim_mono.b.x.setpoint.read()[sim_mono.b.x.setpoint.name]['timestamp']
-    b_y_timestamp = sim_mono.b.y.setpoint.read()[sim_mono.b.y.setpoint.name]['timestamp']
+    grating_timestamp = sim_mono.grating_translation.setpoint.read()[sim_mono.grating_translation.setpoint.name]['timestamp']
+    slit_timestamp = sim_mono.slit.setpoint.read()[sim_mono.slit.setpoint.name]['timestamp']
+    en_timestamp = sim_mono.en.setpoint.read()[sim_mono.en.setpoint.name]['timestamp']
+    m1_timestamp = m1.setpoint.read()[m1.setpoint.name]['timestamp']
 
-    #In this test device we will always restore a.x then a.y, then b.y then b.x
-    assert a_x_timestamp < a_y_timestamp < b_y_timestamp < b_x_timestamp
-
+    assert en_timestamp > slit_timestamp > grating_timestamp 
+    assert en_timestamp > slit_timestamp > m1_timestamp
 
 
 

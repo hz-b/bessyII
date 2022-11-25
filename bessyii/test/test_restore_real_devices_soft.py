@@ -264,7 +264,7 @@ def test_restore_au13():
 
         assert new_conf[key]["value"] == init_conf[key]["value"] 
 
-@pytest.mark.skip(reason="this works")
+#@pytest.mark.skip(reason="this works")
 def test_restore_pgm():
     
     #read the initial configuration of the device 
@@ -278,7 +278,8 @@ def test_restore_pgm():
     #Move the motors to some other positions
     ue48_pgm.ID_on.set(0) #id off
     
-    ue48_pgm.grating_translation.move(43).wait()
+    ue48_pgm.grating_translation.move(41).wait()
+    ue48_pgm.cff.set(2.3) #set the cff
     ue48_pgm.en.move(init_pos_en+1).wait()
 
     if ue48_pgm.slit.branch.get() == "CAT":
