@@ -521,8 +521,9 @@ def test_sim_pgm():
 
     #Now attempt to restore the original positions
     baseline_stream = db[uid].baseline
-    
-    device_list = [sim_mono,m1] ## Note we are taking the top level device here which will also restore the sub components because we've defined it that way
+
+    ## Note we have to include the top level device and all of it's children because we want to restore it in the special order defined in sim_mono
+    device_list = [sim_mono, sim_mono.en, sim_mono.grating_translation, sim_mono.slit,m1] 
     #attempt the restore
     RE(restore(baseline_stream, device_list))
 
@@ -538,8 +539,11 @@ def test_sim_pgm():
     en_timestamp = sim_mono.en.setpoint.read()[sim_mono.en.setpoint.name]['timestamp']
     m1_timestamp = m1.setpoint.read()[m1.setpoint.name]['timestamp']
 
-    assert en_timestamp > slit_timestamp > grating_timestamp 
-    assert en_timestamp > slit_timestamp > m1_timestamp
+    assert en_timestamp > slit_timestamp 
+    assert slit_timestamp > grating_timestamp 
+
+    assert en_timestamp > slit_timestamp 
+    assert slit_timestamp> m1_timestamp
 
 
 

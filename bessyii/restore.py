@@ -9,6 +9,7 @@ from bluesky.utils import (
 
 import bluesky.preprocessors as bpp
 from bluesky.protocols import Status
+from ophyd import PseudoPositioner
 
 def restore(baseline_stream, devices, use_readback=True, md=None):
     """
@@ -39,77 +40,76 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
     _md.update(md or {})
           
     
-    baseline_data = baseline_stream.read()
+    
     @bpp.run_decorator(md=_md)
     def inner_restore():
-        status_objects = []
         
+        baseline_data = baseline_stream.read()
+        
+        list_of_top_level_devices = []
 
-
+        #find the list of top level devices
         for device in devices:
 
-            restore_dict = {}
-            configuration = {}
+            #find out if it's got parents in the list of devices
+            list_of_parents_of_device = []
+            if device.parent:
+                list_of_parents_of_device = [device.parent]
+                current_parent = device.parent
+                while current_parent.parent != None:
+                    current_parent = current_parent.parent
+                    list_of_parents_of_device.append(current_parent)
 
-            #find out if it's got parents
-            #Check that this device does not have a parent in the list of devices
-            if device.parent not in devices:
-                found_config = False
-                
-                #find the name of the device containing this device in the list
-                if device.parent == None: # if this device is a top level parent then we can only configure it if it's in the baseline
-                    
-                    #get the configuration x_array from the baseline
-                    configuration = baseline_stream.config[device.name].read()
-                    found_config = True
-                
-                else:   # this is a child without parents in the list (but possibly parents in the baseline)
-                    
-                    list_of_parents_of_device = [device.parent]
-                    current_parent = device.parent
-                    while current_parent.parent != None:
-                        current_parent = current_parent.parent
-                        list_of_parents_of_device.append(current_parent)
-                        
-                    list_of_devices_in_baseline =[]
-                    for k,v in baseline_stream.config.items():
-                        list_of_devices_in_baseline.append(k)
-                        
-                    #find if there is a parent in the baseline
-                    found_config = False
-                    for parent_device in list_of_parents_of_device:
-                        
-                        if parent_device.name in list_of_devices_in_baseline:
-                            
-                            configuration = baseline_stream.config[parent_device.name].read()
-                            found_config = True
-                            break
-                            
-                if not found_config:
-                    
-                    raise KeyError(f"There is no device in the baseline matching {device.name}")
+            if len(list(set(list_of_parents_of_device) & set(devices))) == 0: #if there are no parents in the list
+
+                list_of_top_level_devices.append(device)
+
+        #Create another list with all the other devices    
+        list_of_component_devices = list(set(devices) -set(list_of_top_level_devices))
+        for device in devices:
+
+            if isinstance(device, PseudoPositioner):
+                #then add all of the components positioners to the list of component devices
+                for component_name in device.component_names:
+
+                    component = getattr(device,component_name)
+                    list_of_component_devices.append(component)
+
+        #Add pseudo_positioner components
         
+        for device in list_of_top_level_devices:
+            restore_dict = {}
+            conf_dict = {}
+            position_dict = {}
 
-    
+            configuration = baseline_stream.config[device.root.name].read()#get the config of the root device.
+
             # Make a dictionary that can be passed to device.restore
-            
             for conf_attr in device.configuration_attrs:
 
                 conf_attr_sig_name =device.name +"_"+conf_attr.replace(".","_")
 
-            
-
                 if conf_attr_sig_name in configuration:
 
-                    restore_dict[conf_attr_sig_name] = configuration[conf_attr_sig_name].values[0]
+                    conf_dict[conf_attr_sig_name] = configuration[conf_attr_sig_name].values[0]
+            #print(f"conf dict is {conf_dict}")
+
+            #find the position of this device if it has one, and the position of any of it's child components if they are in the list of children in devices list
             
             for key, data in baseline_data.items():
 
-                if "setpoint" in key and device.name in key:
-                    restore_dict[key] = data.values[0]
+                if device.name + "_setpoint" in key: #will get more than we want in case of undulator, but it's ok because the device will take care
+                    position_dict[key] = data.values[0]
 
-            #check if the device has a method restore()
+                else:
+                    for component_device in list_of_component_devices:
+
+                        if component_device.name +"_setpoint" in key:
+                            position_dict[key] = data.values[0]
             
+            #now join these two dicts and pass that to the top level device which will implement it recursively, conf first, then positioners
+            restore_dict = {**conf_dict, **position_dict}
+
             if hasattr(device, "restore"):
 
                 if callable(device.restore):
@@ -117,16 +117,9 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                     #if it has a restore method then call it, pass the entire baseline dict. It is expected to search this and check what it needs to do
 
                     yield Msg('restore', device, restore_dict, group = 'restore')
-            
-            else:
 
-                pass
-
-    
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
-
-        return tuple(status_objects)
 
     return(yield from inner_restore())
 
