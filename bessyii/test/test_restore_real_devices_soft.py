@@ -39,7 +39,7 @@ ue48_au4_sissy = AU4('AU04Y02U112L:', name= "ue48_au4_sissy")
 ue48_au4_sissy.wait_for_connection()
 
 ue48_m4_sissy = SMU2 ('HEX6OS12L:' ,name='ue48_m4_sissy')
-ue48_m4_sissy.wait_for_connection()
+#ue48_m4_sissy.wait_for_connection(timeout=20)
 
 ue48_sissy_diode_2 = DiodeEMIL("DIODE02Y02U112L:M0",name = "ue48_sissy_diode_2" )
 ue48_sissy_diode_2.wait_for_connection()
@@ -48,7 +48,7 @@ ue48 = HelicalUndulator("UE48IT6R:", name = "ue48")
 ue48.wait_for_connection()
 
 ue48_au1 = AU13("WAUY01U012L:", name = "ue48_au1")
-ue48_au1.wait_for_connection()
+#ue48_au1.wait_for_connection()
 
 ue48_pgm = PGMSoft("ue481pgm1:", name="ue48_pgm")
 ue48_pgm.wait_for_connection()
@@ -92,7 +92,7 @@ def test_restore_diodes_and_filters():
 
     #Move the motors to some other positions
 
-    RE(mv(ue48_sissy_diode_2,26))
+    ue48_sissy_diode_2.move(25).wait()
 
     ue48_sissy_diode_2.velocity.set(3)
 

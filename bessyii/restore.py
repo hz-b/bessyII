@@ -98,13 +98,13 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
             
             for key, data in baseline_data.items():
 
-                if device.name + "_setpoint" in key: #will get more than we want in case of undulator, but it's ok because the device will take care
+                if device.name + "_setpoint" in key or device.name + "_user_setpoint" in key: #will get more than we want in case of undulator, but it's ok because the device will take care
                     position_dict[key] = data.values[0]
 
                 else:
                     for component_device in list_of_component_devices:
 
-                        if component_device.name +"_setpoint" in key:
+                        if component_device.name +"_setpoint" in key or component_device.name + "_user_setpoint" in key:
                             position_dict[key] = data.values[0]
             
             #now join these two dicts and pass that to the top level device which will implement it recursively, conf first, then positioners

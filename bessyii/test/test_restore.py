@@ -294,6 +294,8 @@ def test_restore_values():
     m2.velocity.set(new_config[1])
     stage.a.x.velocity.set(new_config[2])
     stage.b.y.velocity.set(new_config[3])
+    stage.a.x.settle_time = 1
+    stage.b.y.settle_time = 0.2
     stage.a.config_param.set(new_config[4])
     stage.config_param.set(new_config[5])
 
@@ -510,9 +512,9 @@ def test_sim_pgm():
     
 
     
-    sim_mono.grating_translation.settle_time = 1
-    sim_mono.slit.settle_time = 1
-    sim_mono.en.settle_time = 1
+    sim_mono.grating_translation.settle_time = 0.5
+    sim_mono.slit.settle_time = 2
+    sim_mono.en.settle_time = 0.5
     m1.settle_time = 0
     new_positions = [4,12,2]
     RE(mv(sim_mono.grating_translation,new_positions[0], sim_mono.slit, new_positions[1], sim_mono.en, new_positions[2]))
