@@ -311,8 +311,7 @@ def test_restore_pgm():
     init_conf = ue48_pgm.read_configuration()
     init_au4 = ue48_au4_sissy.top.user_setpoint.get()
     init_pos_en = ue48_pgm.en.setpoint.get()
-    init_pos_grating = ue48_pgm.grating_translation.setpoint.get() #note we are looking at the absolute value!
-    init_pos_slit = ue48_pgm.slit.setpoint.get()
+    init_pos_grating = ue48_pgm.grating_translation.readback.get() #note we are looking at the absolute value!
 
     #Move the motors to some other positions
     ue48_pgm.ID_on.set(0) #id off
@@ -349,7 +348,7 @@ def test_restore_pgm():
 
     #Check that all the positions have been restored
     assert ue48_pgm.en.setpoint.get() == init_pos_en 
-    assert ue48_pgm.grating_translation.setpoint.get() == init_pos_grating
+    assert abs(ue48_pgm.grating_translation.readback.get() - init_pos_grating) <= 0.1
     assert ue48_pgm.slit.setpoint.get() == init_pos_slit
     assert ue48_au4_sissy.top.user_setpoint.get() == init_au4
     #Check that all the positions have been restored

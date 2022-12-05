@@ -104,7 +104,11 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                 else:
                     for component_device in list_of_component_devices:
 
+                        #add the setpoints
                         if component_device.name +"_setpoint" in key or component_device.name + "_user_setpoint" in key:
+                            position_dict[key] = data.values[0]
+                        #add the readbacks if the devices want them
+                        elif component_device.name +"_readback" == key or component_device.name == key  or component_device.name + "_user_readback" in key:
                             position_dict[key] = data.values[0]
             
             #now join these two dicts and pass that to the top level device which will implement it recursively, conf first, then positioners
