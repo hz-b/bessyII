@@ -23,7 +23,8 @@ beamline_name = "Test Beamline"
 RE.md["beamline"] = beamline_name
 
 ##set up some test devices
-from bessyii_devices.au import AU4, AU13
+from bessyii_devices.au import AU4, AU13, AU2
+from bessyii_devices.pinhole import Pinhole
 from bessyii_devices.m3_m4_mirrors import SMU2, SMU3, Hexapod
 from bessyii_devices.sim import SimPositionerDone
 from bessyii_devices.diodes import DiodeEMIL
@@ -31,14 +32,12 @@ from bessyii_devices.undulator import HelicalUndulator
 from bessyii_devices.pgm import PGMSoft
 
 
-
-
-
 sim_shutter = SimPositionerDone(name='sim_shutter')
 ue48_au4_sissy = AU4('AU04Y02U112L:', name= "ue48_au4_sissy")
 ue48_au4_sissy.wait_for_connection()
 
 ue48_m4_sissy = SMU2 ('HEX6OS12L:' ,name='ue48_m4_sissy')
+ue48_m3_cat   = Hexapod('HEX4OS12L:' ,name='ue48_m3_cat'  )
 #ue48_m4_sissy.wait_for_connection(timeout=20)
 
 ue48_sissy_diode_2 = DiodeEMIL("DIODE02Y02U112L:M0",name = "ue48_sissy_diode_2" )
@@ -48,6 +47,16 @@ ue48 = HelicalUndulator("UE48IT6R:", name = "ue48")
 ue48.wait_for_connection()
 
 ue48_au1 = AU13("WAUY01U012L:", name = "ue48_au1")
+ue48_au2       = AU2 ('ue481pgm1:',   name='ue48_au2'      )
+ue48_au3_sissy = AU13('AUY02U112L:',  name='ue48_au3_sissy')
+ue48_au3_cat   = AU13('AUY02U212L:',  name='ue48_au3_cat'  )
+ue48_au4_cat   = AU4 ('AU04Y02U212L:',   name='ue48_au4_cat'      )
+ue48_au4_sissy = AU4 ('AU04Y02U112L:',   name='ue48_au4_sissy'      )
+
+
+# Pinhole
+ph =   Pinhole('PHY01U012L:', name='ph')
+
 #ue48_au1.wait_for_connection()
 
 ue48_pgm = PGMSoft("ue481pgm1:", name="ue48_pgm")
@@ -64,7 +73,7 @@ def switch(end_station,devices, uid=None,md=None):
         
 # Create a baseline
 sd = BessySupplementalData()
-sd.baseline = [ue48,ue48_au1,ue48_pgm,ue48_au4_sissy,ue48_m4_sissy,ue48_sissy_diode_2]
+sd.baseline = [ue48,ue48_au1,ue48_pgm,ue48_au4_sissy,ue48_m4_sissy,ue48_m3_cat, ue48_sissy_diode_2, ue48_au3_sissy, ue48_au3_cat, ue48_au2, ph]
 
 # Add the beamline status PV
 sd.light_status = light_status
@@ -158,12 +167,12 @@ def test_restore_m4_choice():
     #read the initial configuration of the device 
 
     init_conf = ue48_m4_sissy.choice.read_configuration()
-    init_pos = ue48_m4_sissy.rtx.setpoint.get()
+    init_pos = ue48_m4_sissy.tx.setpoint.get()
     init_pos_readback = ue48_m4_sissy.tx.readback.get()
     init_choice = ue48_m4_sissy.choice.readback.get()
    
     #Move the motors to some other positions
-    RE(mv(ue48_m4_sissy.tx,ue48_m4_sissy.rtx.setpoint.get()+5))
+    RE(mv(ue48_m4_sissy.tx,ue48_m4_sissy.tx.setpoint.get()+5))
 
     #Now switch the light to the other end station
     if ue48_m4_sissy.choice.readback.get() == "SISSY-I":
@@ -186,7 +195,7 @@ def test_restore_m4_choice():
     new_conf = ue48_m4_sissy.choice.read_configuration()
 
     ## Check that the setpoint has been correctly set
-    assert ue48_m4_sissy.rtx.setpoint.get() == init_pos 
+    assert ue48_m4_sissy.tx.setpoint.get() == init_pos 
 
     ##check that the readback is within 3um
     assert np.abs(ue48_m4_sissy.tx.readback.get() - init_pos_readback) < 3
@@ -207,12 +216,12 @@ def test_restore_m4_hexapod():
     #read the initial configuration of the device 
 
     init_conf = ue48_m4_sissy.read_configuration()
-    init_pos = ue48_m4_sissy.rtx.setpoint.get()
+    init_pos = ue48_m4_sissy.tx.setpoint.get()
     init_pos_readback = ue48_m4_sissy.tx.readback.get()
     init_choice = ue48_m4_sissy.choice.readback.get()
    
     #Move the motors to some other positions
-    RE(mv(ue48_m4_sissy.tx,ue48_m4_sissy.rtx.setpoint.get()+5))
+    RE(mv(ue48_m4_sissy.tx,ue48_m4_sissy.tx.setpoint.get()+5))
 
 
     #Now attempt to restore the original positions
@@ -227,7 +236,7 @@ def test_restore_m4_hexapod():
     new_conf = ue48_m4_sissy.read_configuration()
 
     ## Check that the setpoint has been correctly set
-    assert ue48_m4_sissy.rtx.setpoint.get() == init_pos 
+    assert ue48_m4_sissy.tx.setpoint.get() == init_pos 
 
     ##check that the readback is within 3um
     assert np.abs(ue48_m4_sissy.tx.readback.get() - init_pos_readback) < 3
@@ -235,6 +244,39 @@ def test_restore_m4_hexapod():
     ##Check that the choice parameter is correctly set
     assert ue48_m4_sissy.choice.readback.get() == init_choice
 
+
+    for key, item in new_conf.items():
+
+        assert new_conf[key]["value"] == init_conf[key]["value"]
+
+
+def test_restore_m3_hexapod(): 
+    
+    #read the initial configuration of the device 
+
+    init_conf = ue48_m3_cat.read_configuration()
+    init_pos_readback = ue48_m3_cat.real_position
+   
+   
+    #Move the motors to some other positions
+
+    RE(mv(ue48_m3_cat.tx,ue48_m3_cat.tx.setpoint.get()+5))
+    RE(mv(ue48_m3_cat.ty,ue48_m3_cat.ty.setpoint.get()+5))
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+    
+    device_list = [ue48_m3_cat] 
+
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    #read the current conf
+    new_conf = ue48_m3_cat.read_configuration()
+
+
+    ##check that the readback is within 3um
+    assert abs(ue48_m3_cat.real_position - init_pos_readback) < 10
 
     for key, item in new_conf.items():
 
@@ -271,11 +313,9 @@ def test_restore_undulator():
     for key, item in new_conf.items():
 
         assert new_conf[key]["value"] == init_conf[key]["value"]   
-    
-
 
 @pytest.mark.skip(reason="no write access on this machine (sissy-serv-03)")
-def test_restore_au13():
+def test_restore_au1():
     
     #read the initial configuration of the device 
 
@@ -284,7 +324,7 @@ def test_restore_au13():
 
     #Move the motors to some other positions
 
-    RE(mv(ue48_au1.top,-0.5))
+    RE(mv(ue48_au1.top,-4))
 
     #Now attempt to restore the original positions
     baseline_stream = db[uid].baseline
@@ -303,7 +343,94 @@ def test_restore_au13():
 
         assert new_conf[key]["value"] == init_conf[key]["value"] 
 
-#@pytest.mark.skip(reason="this works")
+@pytest.mark.skip(reason="this works")
+def test_restore_au3():
+    
+    #read the initial configuration of the device 
+
+    init_conf = ue48_au3_sissy.read_configuration()
+    init_pos = ue48_au3_sissy.top.setpoint.get()
+
+    #Move the motors to some other positions
+
+    RE(mv(ue48_au3_sissy.top,-4))
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+    
+    device_list = [ue48_au3_sissy, ue48_au3_sissy.top] 
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    #read the current conf
+    new_conf = ue48_au3_sissy.read_configuration()
+
+    assert abs(ue48_au3_sissy.top.setpoint.get() - init_pos) < 0.2
+   
+
+    for key, item in new_conf.items():
+
+        assert new_conf[key]["value"] == init_conf[key]["value"] 
+
+@pytest.mark.skip(reason="this works")
+def test_restore_au2():
+    
+    #read the initial configuration of the device 
+
+    init_conf = ue48_au2.read_configuration()
+    init_pos = ue48_au2.top.setpoint.get()
+
+    #Move the motors to some other positions
+
+    RE(mv(ue48_au2.top,1))
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+    
+    device_list = [ue48_au2, ue48_au2.top] 
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    #read the current conf
+    new_conf = ue48_au2.read_configuration()
+
+    assert abs(ue48_au2.top.setpoint.get() - init_pos) < 0.2
+   
+
+    for key, item in new_conf.items():
+
+        assert new_conf[key]["value"] == init_conf[key]["value"] 
+
+@pytest.mark.skip(reason="no write access on sissy-serv-03")
+def test_restore_ph():
+    
+    #read the initial configuration of the device 
+
+    init_conf = ph.read_configuration()
+    init_pos = ph.h.setpoint.get()
+
+    #Move the motors to some other positions
+
+    RE(mv(ph.h,-0.2))
+
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+    
+    device_list = [ph,ph.h] 
+    #attempt the restore
+    RE(restore(baseline_stream, device_list))
+
+    #read the current conf
+    new_conf = ph.read_configuration()
+
+    assert abs(ph.h.setpoint.get() - init_pos) < 0.1
+   
+
+    for key, item in new_conf.items():
+
+        assert new_conf[key]["value"] == init_conf[key]["value"] 
+
+@pytest.mark.skip(reason="this works")
 def test_restore_pgm():
     
     #read the initial configuration of the device 
@@ -316,9 +443,11 @@ def test_restore_pgm():
     #Move the motors to some other positions
     ue48_pgm.ID_on.set(0) #id off
     
-    ue48_pgm.grating_translation.move(41).wait()
+    #ue48_pgm.grating_translation.move(43).wait()
     ue48_pgm.cff.set(2.3) #set the cff
     ue48_pgm.en.move(init_pos_en+1).wait()
+    init_pos_slit = ue48_pgm.slit.setpoint.get()
+    ue48_pgm.slit.move(init_pos_slit+1).wait()
 
     if ue48_pgm.slit.branch.get() == "CAT":
 
@@ -328,9 +457,9 @@ def test_restore_pgm():
 
         ue48_pgm.slit.branch.set("CAT")
 
-    init_pos_slit = ue48_pgm.slit.setpoint.get()
+    
 
-    ue48_pgm.slit.move(init_pos_slit+1).wait()
+    
 
     ue48_au4_sissy.top.move(12).wait()
     
@@ -339,7 +468,7 @@ def test_restore_pgm():
     #Now attempt to restore the original positions
     baseline_stream = db[uid].baseline
     
-    device_list = [ue48_pgm,ue48_pgm.grating_translation,ue48_pgm.slit, ue48_pgm.en,ue48_au4_sissy.top] 
+    device_list = [ue48_pgm,ue48_pgm.grating_trans_sel,ue48_pgm.slit, ue48_pgm.en,ue48_au4_sissy.top] 
     #attempt the restore
     RE(restore(baseline_stream, device_list))
 

@@ -32,9 +32,10 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
 
    
     """
-    
+
     _md = {'identifier': baseline_stream.metadata['start']['uid'],
            'plan_name': 'restore',
+           'devices': [dev.name for dev in devices],
            'hints': {}
            }
     _md.update(md or {})
@@ -99,6 +100,8 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
             for key, data in baseline_data.items():
 
                 if device.name + "_setpoint" in key or device.name + "_user_setpoint" in key: #will get more than we want in case of undulator, but it's ok because the device will take care
+                    position_dict[key] = data.values[0]
+                elif device.name +"_readback" == key or device.name == key  or device.name + "_user_readback" in key:
                     position_dict[key] = data.values[0]
 
                 else:
