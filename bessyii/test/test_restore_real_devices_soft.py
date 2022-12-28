@@ -87,7 +87,9 @@ RE(count([noisy_det]))
 #get the uid
 uid = db[-1].metadata['start']['uid'][:8]
 
+def test_uid_exists():
 
+    baseline = db[uid].baseline
 ## define the tests
 @pytest.mark.skip(reason="this works")
 def test_restore_diodes_and_filters():
@@ -249,7 +251,7 @@ def test_restore_m4_hexapod():
 
         assert new_conf[key]["value"] == init_conf[key]["value"]
 
-
+@pytest.mark.skip(reason="this works")
 def test_restore_m3_hexapod(): 
     
     #read the initial configuration of the device 
@@ -430,9 +432,11 @@ def test_restore_ph():
 
         assert new_conf[key]["value"] == init_conf[key]["value"] 
 
-@pytest.mark.skip(reason="this works")
+#@pytest.mark.skip(reason="this works")
 def test_restore_pgm():
-    
+    #Now attempt to restore the original positions
+    baseline_stream = db[uid].baseline
+
     #read the initial configuration of the device 
 
     init_conf = ue48_pgm.read_configuration()
@@ -443,10 +447,10 @@ def test_restore_pgm():
     #Move the motors to some other positions
     ue48_pgm.ID_on.set(0) #id off
     
-    #ue48_pgm.grating_translation.move(43).wait()
+    ue48_pgm.grating_translation.move(43).wait()
     ue48_pgm.cff.set(2.3) #set the cff
     ue48_pgm.en.move(init_pos_en+1).wait()
-    init_pos_slit = ue48_pgm.slit.setpoint.get()
+    init_pos_slit = ue48_pgm.slit.readback.get()
     ue48_pgm.slit.move(init_pos_slit+1).wait()
 
     if ue48_pgm.slit.branch.get() == "CAT":
@@ -457,16 +461,7 @@ def test_restore_pgm():
 
         ue48_pgm.slit.branch.set("CAT")
 
-    
-
-    
-
     ue48_au4_sissy.top.move(12).wait()
-    
-
-
-    #Now attempt to restore the original positions
-    baseline_stream = db[uid].baseline
     
     device_list = [ue48_pgm,ue48_pgm.grating_trans_sel,ue48_pgm.slit, ue48_pgm.en,ue48_au4_sissy.top] 
     #attempt the restore
@@ -478,12 +473,13 @@ def test_restore_pgm():
     #Check that all the positions have been restored
     assert ue48_pgm.en.setpoint.get() == init_pos_en 
     assert abs(ue48_pgm.grating_translation.readback.get() - init_pos_grating) <= 0.1
-    assert ue48_pgm.slit.setpoint.get() == init_pos_slit
+    assert abs(ue48_pgm.slit.readback.get()- init_pos_slit) <= 0.1
     assert ue48_au4_sissy.top.user_setpoint.get() == init_au4
     #Check that all the positions have been restored
     for key, item in new_conf.items():
 
-        assert new_conf[key]["value"] == init_conf[key]["value"]  
+        if "stxm" not in key:
+            assert new_conf[key]["value"] == init_conf[key]["value"]  
 
     #finally check that the order that things were set is correct
     
@@ -493,3 +489,4 @@ def test_restore_pgm():
     
     #Check that the grating is set first, then the slit, then the energy
     assert grating_time < slit_time < en_time 
+
