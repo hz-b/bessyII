@@ -127,7 +127,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                     ret = yield Msg('restore', device, restore_dict, group = 'restore')
                     status_objects.append(ret)
                 
-        print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
+        #print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
         return(tuple(status_objects))
 

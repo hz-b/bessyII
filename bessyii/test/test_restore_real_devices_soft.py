@@ -125,7 +125,7 @@ def test_restore_diodes_and_filters():
         assert new_conf[key]["value"] == init_conf[key]["value"]
 
 
-@pytest.mark.skip(reason="this works")
+#@pytest.mark.skip(reason="this works")
 def test_restore_au4():
     
     #test whether we can restore the configuration of a parent device (and all it's children)
@@ -432,7 +432,7 @@ def test_restore_ph():
 
         assert new_conf[key]["value"] == init_conf[key]["value"] 
 
-#@pytest.mark.skip(reason="this works")
+@pytest.mark.skip(reason="this works")
 def test_restore_pgm():
     #Now attempt to restore the original positions
     baseline_stream = db[uid].baseline
