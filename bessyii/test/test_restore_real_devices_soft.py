@@ -125,7 +125,7 @@ def test_restore_diodes_and_filters():
         assert new_conf[key]["value"] == init_conf[key]["value"]
 
 
-#@pytest.mark.skip(reason="this works")
+@pytest.mark.skip(reason="this works")
 def test_restore_au4():
     
     #test whether we can restore the configuration of a parent device (and all it's children)
@@ -374,7 +374,7 @@ def test_restore_au3():
 
         assert new_conf[key]["value"] == init_conf[key]["value"] 
 
-@pytest.mark.skip(reason="this works")
+#@pytest.mark.skip(reason="this works")
 def test_restore_au2():
     
     #read the initial configuration of the device 
@@ -432,7 +432,7 @@ def test_restore_ph():
 
         assert new_conf[key]["value"] == init_conf[key]["value"] 
 
-@pytest.mark.skip(reason="this works")
+#@pytest.mark.skip(reason="this works")
 def test_restore_pgm():
     #Now attempt to restore the original positions
     baseline_stream = db[uid].baseline
@@ -441,7 +441,7 @@ def test_restore_pgm():
 
     init_conf = ue48_pgm.read_configuration()
     init_au4 = ue48_au4_sissy.top.user_setpoint.get()
-    init_pos_en = ue48_pgm.en.setpoint.get()
+    init_pos_en = ue48_pgm.en.readback.get()
     init_pos_grating = ue48_pgm.grating_translation.readback.get() #note we are looking at the absolute value!
 
     #Move the motors to some other positions
@@ -471,7 +471,7 @@ def test_restore_pgm():
     new_conf = ue48_pgm.read_configuration()
 
     #Check that all the positions have been restored
-    assert ue48_pgm.en.setpoint.get() == init_pos_en 
+    assert abs(ue48_pgm.en.reaback.get() -init_pos_en) <= 0.1
     assert abs(ue48_pgm.grating_translation.readback.get() - init_pos_grating) <= 0.1
     assert abs(ue48_pgm.slit.readback.get()- init_pos_slit) <= 0.1
     assert ue48_au4_sissy.top.user_setpoint.get() == init_au4

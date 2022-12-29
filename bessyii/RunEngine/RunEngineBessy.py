@@ -32,27 +32,29 @@ class RunEngineBessy(RunEngine):
         kwargs = dict(msg.kwargs)
         group = kwargs.pop('group', None)
         self._movable_objs_touched.add(msg.obj)
-        ret = None
+        status_object_list = []
 
         if hasattr(msg.obj, "restore"):
 
-            ret = msg.obj.restore(*msg.args, **kwargs)
+            status_object_list = msg.obj.restore(*msg.args, **kwargs) #ret is a list of status objects
             p_event = asyncio.Event(loop=self._loop_for_kwargs)
             pardon_failures = self._pardon_failures
 
             def done_callback(status=None):
                 self.log.debug("The object %r reports restore is done "
-                            "with status %r", msg.obj, ret.success)
+                            "with status %r", msg.obj, status.success)
                 task = self._loop.call_soon_threadsafe(
-                    self._status_object_completed, ret, p_event, pardon_failures)
+                    self._status_object_completed, status, p_event, pardon_failures)
                 self._status_tasks.append(task)
 
-            if ret: #if we are actually moving any movers
+            if status_object_list: #if we are actually moving any movers
                 
-                ret.add_callback(done_callback)
+                for status in status_object_list:
+                    if status:
+                        status.add_callback(done_callback)
 
-                self._groups[group].add(p_event.wait)
-                self._status_objs[group].add(ret)
+                        self._groups[group].add(p_event.wait)
+                        self._status_objs[group].add(status)
 
-                return ret
+                return status_object_list
 

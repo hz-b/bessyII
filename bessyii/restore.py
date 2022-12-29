@@ -125,7 +125,8 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
                     #if it has a restore method then call it, pass the entire baseline dict. It is expected to search this and check what it needs to do
 
                     ret = yield Msg('restore', device, restore_dict, group = 'restore')
-                    status_objects.append(ret)
+                    if ret:
+                        status_objects = status_objects + ret #concatenate any new status objects into the list
                 
         #print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
