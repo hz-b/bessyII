@@ -32,6 +32,7 @@ class RunEngineBessy(RunEngine):
         kwargs = dict(msg.kwargs)
         group = kwargs.pop('group', None)
         self._movable_objs_touched.add(msg.obj)
+        ret = None
 
         if hasattr(msg.obj, "restore"):
 
@@ -42,9 +43,9 @@ class RunEngineBessy(RunEngine):
             def done_callback(status=None):
                 self.log.debug("The object %r reports restore is done "
                             "with status %r", msg.obj, ret.success)
-                self._loop.call_soon_threadsafe(
+                task = self._loop.call_soon_threadsafe(
                     self._status_object_completed, ret, p_event, pardon_failures)
-
+                self._status_tasks.append(task)
 
             if ret: #if we are actually moving any movers
                 

@@ -48,6 +48,7 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
         baseline_data = baseline_stream.read()
         
         list_of_top_level_devices = []
+        status_objects = []
 
         #find the list of top level devices
         for device in devices:
@@ -123,10 +124,12 @@ def restore(baseline_stream, devices, use_readback=True, md=None):
 
                     #if it has a restore method then call it, pass the entire baseline dict. It is expected to search this and check what it needs to do
 
-                    yield Msg('restore', device, restore_dict, group = 'restore')
-
+                    ret = yield Msg('restore', device, restore_dict, group = 'restore')
+                    status_objects.append(ret)
+                
         print(f"Restoring devices to run {baseline_stream.metadata['start']['uid']}")
         yield Msg('wait', None, group='restore')
+        return(tuple(status_objects))
 
     return(yield from inner_restore())
 
