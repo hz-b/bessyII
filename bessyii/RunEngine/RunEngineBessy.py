@@ -1,5 +1,6 @@
 from bluesky.run_engine import RunEngine
 from ophyd import Kind,Device 
+import inspect
 
 class RunEngineBessy(RunEngine):
     """RunEngine modifications at BESYYII
@@ -16,6 +17,9 @@ class RunEngineBessy(RunEngine):
     
     def __call__(self, *args, **metadata_kw):
         kind_map = {} # dictionary with original hinted/normal states. 
+
+        metadata_kw.setdefault('commad_elog_test',inspect.stack()[1].code_context)
+
         #make sure the plan has detectors. if not we don't need silent detectors
         if 'detectors' in args[0].gi_frame.f_locals:
             # NOTE: we use detector instance is the key - to avoid problem with hacked component names (e.g. keithley sets readback name to the device name)
