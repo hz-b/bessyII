@@ -13,7 +13,7 @@ from bluesky.utils import (
 
 from ophyd import Signal
 
-def flycount(detectors,flyer, *,delay=0.2, md=None):
+def flycount(detectors,flyer, *,delay=0.2,shutter=None, md=None):
     """
     read from detectors in a list while a flyer is running. Stop only when it completes
 
@@ -24,6 +24,8 @@ def flycount(detectors,flyer, *,delay=0.2, md=None):
     flyer : flyer object
     delay : iterable or scalar, optional
         Time delay in seconds between successive readings; default is 0.2
+    shutter : Device with open and close value attributes
+        If defined, a shutter will be opened when the device complete's kickoff
     md : dict, optional
         metadata
 
@@ -58,66 +60,28 @@ def flycount(detectors,flyer, *,delay=0.2, md=None):
 
     # Get the status object that tells us when it's done
     complete_status = yield from bps.complete(flyer, wait=False)
+
+    #Now open the shutter if it's defined
+    if shutter:
+        yield from bps.mov(shutter,shutter.open_value,wait=True)
+
     while not complete_status.done:
 
         yield Msg('checkpoint') # allows us to pause the run 
         yield from bps.one_shot(detectors) #triggers and reads everything in the detectors list
         yield Msg('sleep', None, delay)
 
+    #Now close the shutter if it's defined
+    if shutter:
+        yield from bps.mov(shutter,shutter.close_value,wait=True)
+
     yield from bps.close_run()
     return uid
 
 
-def create_command_string_for_flyscan(detectors, motor_name, start, stop, vel, delay):
-    """
-    Create a string to attach to the metadata with the command used
-    to start the scan
-
-    Parameters
-    ----------
-    detectors : list
-        list of 'readable' objects
-    *args :
-        For one dimension, ``motor, start, stop``.
-        In general:
-
-        .. code-block:: python
-
-            motor1, start1, stop1,
-            motor2, start2, start2,
-            ...,
-            motorN, startN, stopN
-
-        Motors can be any 'settable' object (motor, temp controller, etc.)
-    num : integer
-        number of points
-    
-    Returns
-    ----------
-    command: a string representing the scan command
-
-    Tested for
-    --------
-    :func:`bluesky.plans.scan`
-    """
-    try:
-        # detectors
-        detector_names = [det.name for det in detectors]
-        detector_names_string = '['
-        for d in detector_names:
-            detector_names_string += d + ','
-        detector_names_string = detector_names_string[0:-1] + ']'
-
-        #motors, motor positions and number of points
-        motors_string = ', '+motor_name +', '+str(start)+', '+str(stop)+', vel='+str(vel)+' delay='+str(delay)
-        command = 'flyscan('+detector_names_string+motors_string+')'
-    except:
-        command = 'It was not possible to create this entry'
-    return command
 
 
-
-def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=None):
+def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,shutter=None,*, md=None):
     
     """
     count detectors while flying a flyer with start, stop, initial scan velocity, and the delay between det sample time
@@ -138,6 +102,8 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=N
         The initial velocity of the flyer; default is 0.1
     delay : iterable or scalar, optional
         Time delay in seconds between successive readings; default is 0.1
+    shutter : Device with open and close value attributes
+        If defined, a shutter will be opened when the device complete's kickoff
     md : dict, optional
         metadata
 
@@ -160,12 +126,11 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=N
         
         raise ValueError("Sample rate too high.Delay must be >= 0.1 \n")
 
-    flyer.velocity.put(vel)
+    yield from bps.configure(flyer,{"velocity":vel})
 
     md_args = [repr(motor),start,stop,vel,del_req]
     x_fields = []
     x_fields.extend(getattr(motor, 'hints', {}).get('fields', []))
-    command_elog = create_command_string_for_flyscan(detectors, flyer.name, start, stop, vel, delay)
     _md = {'detectors': [det.name for det in detectors],
            'motors': x_fields,
            'plan_args': {'detectors': list(map(repr, detectors)),
@@ -174,11 +139,11 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=N
                          'stop' : stop,
                          'vel': vel,
                          'delay': del_req,
+                         'shutter' : shutter,
                          'args':md_args
                          },
 
            'plan_name': 'flyscan',
-           'command_elog' : command_elog,
            'hints': {},
        }
     _md.update(md or {})
@@ -200,4 +165,4 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,*, md=N
     # Configure the flyer (but don't yet init or start)
     yield from bps.abs_set(flyer.start_pos,start)
     yield from bps.abs_set(flyer.end_pos,stop)
-    return(yield from flycount(detectors_list,flyer,delay=del_req,md=_md))
+    return(yield from flycount(detectors_list,flyer,delay=del_req,shutter=shutter,md=_md))
