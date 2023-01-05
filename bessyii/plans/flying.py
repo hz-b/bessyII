@@ -139,7 +139,7 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,shutter
                          'stop' : stop,
                          'vel': vel,
                          'delay': del_req,
-                         'shutter' : shutter,
+                         'shutter' : shutter.name,
                          'args':md_args
                          },
 
