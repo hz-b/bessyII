@@ -166,3 +166,88 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,shutter
     yield from bps.abs_set(flyer.start_pos,start)
     yield from bps.abs_set(flyer.end_pos,stop)
     return(yield from flycount(detectors_list,flyer,delay=del_req,shutter=shutter,md=_md))
+
+
+def mov_count(detectors,motor,start_pos,end_pos,vel, *,delay=0.2, md=None):
+    """
+    read from detectors in a list while a motor is moving. Stop only when it completes
+
+    Parameters
+    ----------
+    detectors : list
+        list of 'readable' objects
+    motor: positioner
+    delay : iterable or scalar, optional
+        Time delay in seconds between successive readings; default is 0.2
+    shutter : Device with open and close value attributes
+        If defined, a shutter will be opened when the device complete's kickoff
+    md : dict, optional
+        metadata
+
+    Notes
+    -----
+
+    """
+
+    #Define the motor metadata (important for plotting)
+    md = md or {}
+
+    
+
+    md_args = [repr(motor),start_pos,end_pos,vel,delay]
+    x_fields = []
+    x_fields.extend(getattr(motor, 'hints', {}).get('fields', []))
+
+    _md = {'detectors': [det.name for det in detectors],
+
+           'plan_args': {'detectors': list(map(repr, detectors))},
+           'motor': motor.name,
+           'start': start_pos,
+           'end': end_pos,
+           'vel': vel,
+           'plan_name': 'mov_count',
+           'args':md_args,
+           'hints': {}
+           }
+
+    _md.update(md or {})
+
+    # Deterime the name of the x axis for plotting from the flyer
+    default_dimensions = [(x_fields, 'primary')]
+    default_hints = {}
+    
+    # The following is left from the scan plan implementation, assumes multiple motors
+    if len(x_fields) > 0:
+        default_hints.update(dimensions=default_dimensions)
+    
+    # now add default_hints and override any hints from the original md (if
+    # exists)
+    
+    _md['hints'] = default_hints
+    _md.update(md)
+
+    #Add the flyer to the list of things we want to count
+    detectors_list = detectors + [motor]
+    
+    # Init the run
+    uid = yield from bps.open_run(_md)
+
+    # Start the flyer and wait until it's reported that it's started
+    initial_vel = motor.velocity.get()
+    yield from bps.mov(motor,start_pos)
+    yield from bps.configure(motor,{"velocity":vel})
+    
+
+    # Get the status object that tells us when it's done
+    complete_status = yield Msg('set', motor, end_pos)
+
+    while not complete_status.done:
+
+        yield Msg('checkpoint') # allows us to pause the run 
+        yield from bps.one_shot(detectors_list) #triggers and reads everything in the detectors list
+        yield Msg('sleep', None, delay)
+
+    
+    yield from bps.close_run()
+    yield from bps.configure(motor,{"velocity":initial_vel})
+    return uid
