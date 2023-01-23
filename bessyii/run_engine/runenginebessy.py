@@ -27,7 +27,9 @@ class RunEngineBessy(RunEngine):
     """RunEngine modifications at BESSYII
 
     List of modifications:
-    - call pre/post processors
+    - call pre/post processors.
+        Call preprocessors allow to modify call arguments (e.g. inject additional metadata) for the run engine.
+        See elog_metadata.py and detectors.py for an example
     """    
 
     def register_call_preprocessor(self, call_prerocessor:RunEngineCallPreprocessor):
