@@ -70,6 +70,8 @@ def flycount(detectors,flyer, *,delay=0.2,shutter=None, md=None):
         yield Msg('checkpoint') # allows us to pause the run 
         yield from bps.one_shot(detectors) #triggers and reads everything in the detectors list
         yield Msg('sleep', None, delay)
+        
+    yield from bps.complete(flyer)
 
     #Now close the shutter if it's defined
     if shutter:
