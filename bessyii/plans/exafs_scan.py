@@ -3,60 +3,6 @@ import datetime
 from bluesky.plans import list_scan
 from bluesky.plans import plan_patterns
 
-def create_command_string_for_exafs_scan(detectors, motor_name, regions,  args):
-    """
-    Create a string to attach to the metadata with the command used
-    to start the scan
-
-    Parameters
-    ----------
-    detectors : list
-        list of 'readable' objects
-    *args :
-        For one dimension, ``motor, start, stop``.
-        In general:
-
-        .. code-block:: python
-
-            motor1, start1, stop1,
-            motor2, start2, start2,
-            ...,
-            motorN, startN, stopN
-
-        Motors can be any 'settable' object (motor, temp controller, etc.)
-    num : integer
-        number of points
-    
-    Returns
-    ----------
-    command: a string representing the scan command
-
-    Tested for
-    --------
-    :func:`bluesky.plans.scan`
-    """
-    try:
-
-        scan_type = 'exafs_scan'
- 
-        # detectors
-        detector_names = [det.name for det in detectors]
-        detector_names_string = '['
-        for d in detector_names:
-            detector_names_string += d + ','
-        detector_names_string = detector_names_string[0:-1] + ']'
-
-        #motors, motor positions and number of points
-
-        motors_string = ', '
-        motors_string += motor_name +', regions='+str(regions)
-        for n in range(regions):
-            motors_string += ', '+str(args[0+n*3])+','+str(args[1+n*3])+','+str(args[2+n*3])
-
-        command = scan_type+'('+detector_names_string+motors_string+')'
-    except:
-        command = 'It was not possible to create this entry'
-    return command
 
 def exafs_scan(detectors,motor,regions=1, *args, per_step=None, md=None,scan=True):
     """
@@ -113,7 +59,6 @@ def exafs_scan(detectors,motor,regions=1, *args, per_step=None, md=None,scan=Tru
     print(points)
     
     
-    command_elog = create_command_string_for_exafs_scan(detectors, motor.name, regions, args) 
     _md = {'detectors': [det.name for det in detectors],
            'motors': motor.name,
            'num_points': points.shape[0],
