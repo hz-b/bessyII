@@ -278,7 +278,7 @@ def change_kind(plan, devices):
             if msg.command == 'wait' and last_msg.command == "trigger":
                 #find the group
                 group = last_msg.kwargs['group']
-                trigger_msgs = [Msg('trigger', sig, group=group) for sig in silent_sig]
+                trigger_msgs = [Msg('trigger', sig, group=group) for sig in silent_det]
                 def new_gen():
                     yield from ensure_generator(trigger_msgs)
                     yield msg
@@ -289,7 +289,7 @@ def change_kind(plan, devices):
         def insert_read_before_read_after_create(msg, last_msg):
             if msg.command == 'read' and last_msg.command == "create":
 
-                read_msgs = [Msg('read', sig) for sig in silent_sig]
+                read_msgs = [Msg('read', sig) for sig in silent_det]
                 def new_gen():
                     yield from ensure_generator(read_msgs)
                     yield msg
