@@ -235,8 +235,7 @@ def valve_open_wrapper(plan, valve):
     ----------
     plan : iterable or iterator
         a generator, list, or similar containing `Msg` objects
-    valve : positioner
-        valve to open
+    valve : positioner with open and close values
 
     Yields
     ------
@@ -248,7 +247,8 @@ def valve_open_wrapper(plan, valve):
         
 
         if (msg.command == 'wait' and "set" in msg.kwargs['group']):
-            return None, abs_set(valve, 1, wait=True)
+
+            return None, abs_set(valve, valve.open_value, wait=True)
             
         elif (msg.command == 'set' and msg.kwargs['group'] not in seen_group_list and msg.obj != valve):
             #Add it to the positioners to move
@@ -261,15 +261,15 @@ def valve_open_wrapper(plan, valve):
                 return ret
                 
             
-            return None, abs_set_in_group(valve, 0, group=grp)
+            return None, abs_set_in_group(valve, valve.close_value, group=grp)
         
         elif (msg.command == 'close_run'):
-             return None, abs_set(valve, 0, wait=True)
+             return None, abs_set(valve, valve.close_value, wait=True)
             
 
         else:
             return None, None
-            
+           
     return (yield from plan_mangler(plan, insert_open_close))
 
     
