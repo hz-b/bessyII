@@ -225,26 +225,26 @@ def mov_count(detectors,motor,start_pos,end_pos,vel, *,delay=0.2, md=None):
 
     #Add the flyer to the list of things we want to count
     detectors_list = detectors + [motor]
+
+    @bpp.stage_decorator(detectors_list)
+    @bpp.run_decorator(md=_md)
+    def inner_mov_count():
+        # Start the flyer and wait until it's reported that it's started
+        initial_vel = motor.velocity.get()
+        yield from bps.mov(motor,start_pos)
+        yield from bps.configure(motor,{"velocity":vel})
     
-    # Init the run
-    uid = yield from bps.open_run(_md)
+        # Get the status object that tells us when it's done
+        complete_status = yield Msg('set', motor, end_pos)
 
-    # Start the flyer and wait until it's reported that it's started
-    initial_vel = motor.velocity.get()
-    yield from bps.mov(motor,start_pos)
-    yield from bps.configure(motor,{"velocity":vel})
+        while not complete_status.done:
+
+            yield Msg('checkpoint') # allows us to pause the run 
+            yield from bps.one_shot(detectors_list) #triggers and reads everything in the detectors list
+            yield Msg('sleep', None, delay)
+
+        
+        yield from bps.configure(motor,{"velocity":initial_vel})
     
-
-    # Get the status object that tells us when it's done
-    complete_status = yield Msg('set', motor, end_pos)
-
-    while not complete_status.done:
-
-        yield Msg('checkpoint') # allows us to pause the run 
-        yield from bps.one_shot(detectors_list) #triggers and reads everything in the detectors list
-        yield Msg('sleep', None, delay)
-
     
-    yield from bps.close_run()
-    yield from bps.configure(motor,{"velocity":initial_vel})
-    return uid
+    return (yield from inner_mov_count())
