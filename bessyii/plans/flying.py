@@ -13,7 +13,7 @@ from bluesky.utils import (
 
 from ophyd import Signal
 
-def flycount(detectors,flyer, *,delay=0.2,shutter=None, md=None):
+def flycount(detectors,flyer, *,delay=0,shutter=None, md=None):
     """
     read from detectors in a list while a flyer is running. Stop only when it completes
 
@@ -23,14 +23,14 @@ def flycount(detectors,flyer, *,delay=0.2,shutter=None, md=None):
         list of 'readable' objects
     flyer : flyer object
     delay : iterable or scalar, optional
-        Time delay in seconds between successive readings; default is 0.2
+        Time delay in seconds between successive readings; default is 0
     shutter : Device with open and close value attributes
         If defined, a shutter will be opened when the device complete's kickoff
     md : dict, optional
         metadata
 
     Notes
-    -----
+    ----
 
     """
 
@@ -50,38 +50,40 @@ def flycount(detectors,flyer, *,delay=0.2,shutter=None, md=None):
     
     _md['hints'].setdefault('dimensions', [(('time',), 'primary')])
     _md.update(md)
-
     
-    # Init the run
-    uid = yield from bps.open_run(_md)
+    @bpp.stage_decorator([flyer]+detectors)
+    @bpp.run_decorator(md=_md)
+    def inner_flycount():
+    
+        # Start the flyer and wait until it's reported that it's started
+        yield from bps.kickoff(flyer, wait=True)
 
-    # Start the flyer and wait until it's reported that it's started
-    yield from bps.kickoff(flyer, wait=True)
+        # Get the status object that tells us when it's done
+        complete_status = yield from bps.complete(flyer, wait=False)
 
-    # Get the status object that tells us when it's done
-    complete_status = yield from bps.complete(flyer, wait=False)
+        #Now open the shutter if it's defined
+        if shutter:
+            yield from bps.mov(shutter,shutter.open_value,wait=True)
 
-    #Now open the shutter if it's defined
-    if shutter:
-        yield from bps.mov(shutter,shutter.open_value,wait=True)
+        while not complete_status.done:
 
-    while not complete_status.done:
+            yield Msg('checkpoint') # allows us to pause the run 
+            yield from bps.one_shot(detectors) #triggers and reads everything in the detectors list
+            yield Msg('sleep', None, delay)
+            
+        yield from bps.collect(flyer)
 
-        yield Msg('checkpoint') # allows us to pause the run 
-        yield from bps.one_shot(detectors) #triggers and reads everything in the detectors list
-        yield Msg('sleep', None, delay)
-
-    #Now close the shutter if it's defined
-    if shutter:
-        yield from bps.mov(shutter,shutter.close_value,wait=True)
-
-    yield from bps.close_run()
-    return uid
-
-
+        #Now close the shutter if it's defined
+        if shutter:
+            yield from bps.mov(shutter,shutter.close_value,wait=True)
 
 
-def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,shutter=None,*, md=None):
+    return (yield from inner_flycount())
+
+
+
+
+def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0,shutter=None,*, md=None):
     
     """
     count detectors while flying a flyer with start, stop, initial scan velocity, and the delay between det sample time
@@ -99,7 +101,7 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,shutter
     stop : float
         The stop value of the flyer
     vel : float
-        The initial velocity of the flyer; default is 0.1
+        The initial velocity of the flyer; default is 0
     delay : iterable or scalar, optional
         Time delay in seconds between successive readings; default is 0.1
     shutter : Device with open and close value attributes
@@ -121,10 +123,6 @@ def flyscan(detectors, flyer, start=None, stop=None, vel =0.2, delay=0.1,shutter
     md = md or {}
 
     del_req = delay
-
-    if del_req < 0.1:
-        
-        raise ValueError("Sample rate too high.Delay must be >= 0.1 \n")
 
     yield from bps.configure(flyer,{"velocity":vel})
 
