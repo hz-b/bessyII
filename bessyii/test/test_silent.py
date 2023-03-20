@@ -4,7 +4,7 @@ import pytest
 from bessyii.default_detectors import SupplementalDataSilentDets, init_silent, close_silent
 
 from bessyii_devices.ring import Ring
-
+from ophyd.sim import SynGauss
 
 
 from ophyd.sim import motor, noisy_det, det, det1, det2, det3,det4,motor, motor1, motor2
@@ -254,14 +254,23 @@ def test_baseline_single_det_double_silent_motor_hinted_check():
     assert motor1.setpoint.kind == Kind.normal
     assert motor1.readback.kind == Kind.hinted
 
-def test_baseline_single_det_multiple_same_silent():
+def test_device_silent_dets():
 
-    D = SupplementalDataSilentDets(baseline=[det1], silent_devices=[det1, det2, det2])
+    """
+    When we change the kind, we want to do it on the read signal. When we trigger and read, we want to do it on the device
+    """
+    D = SupplementalDataSilentDets(silent_devices=[noisy_det])
 
-    RE(D(count([det3])), sd_test)
+    sd_plan = D(count([det3]))
 
-    assert det2.val.kind == Kind.hinted
-    
+    for message in sd_plan:
+
+        if message.command == "trigger" or message.command == "read":
+
+            obj = message.obj
+
+            assert isinstance(obj, SynGauss)
+
 
 
 
