@@ -66,11 +66,12 @@ class simple_load():
     def __init__(self, user_script_location, custom_lines = None):
         self.user_script_location = user_script_location
         self.lines = ["# start of automatically prepended lines",
-                      "from user_ns import *"
                       ]
         if custom_lines != None:
             for cl in custom_lines:
                 self.lines.append(cl)
+        else:
+            self.lines.append("from user_ns import *")
         self.lines.append("# end of automatically prepended lines")
         self.lines.reverse()
     def load_script(self,filepath_within_usl):
